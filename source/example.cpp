@@ -65,6 +65,16 @@ int main(int argc, char *argv[])
     std::vector<float> normals;
     std::vector<uint32_t> faces;
     
+    for (auto e : file.get_elements())
+    {
+        std::cout << "element - " << e.get_name() << " (" << e.get_element_count() << ")" << std::endl;
+        for (auto p : e.get_properties())
+        {
+            std::cout << "\t property - " << p.get_name() << std::endl;
+        }
+    }
+    std::cout << std::endl;
+    
     uint32_t vertexCount = file.request_properties_from_element("vertex", {"x", "y", "z"}, verts);
     uint32_t normalCount = file.request_properties_from_element("vertex", {"nx", "ny", "nz"}, normals);
     uint32_t faceCount = file.request_properties_from_element("face", {"vertex_indices"}, faces);
