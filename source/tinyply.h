@@ -69,8 +69,8 @@ public:
     };
     
     PlyProperty(std::istream& is);
-    PlyProperty(Type type, const std::string& name) : propertyType(type), isList(false), name(name) {}
-    PlyProperty(Type list_type, Type prop_type, const std::string& name) : listType(list_type), propertyType(prop_type), isList(true), name(name) {}
+    PlyProperty(Type type, const std::string & name) : propertyType(type), isList(false), name(name) {}
+    PlyProperty(Type list_type, Type prop_type, const std::string & name) : listType(list_type), propertyType(prop_type), isList(true), name(name) {}
     
     const std::string & get_name() const { return name; }
     bool is_list() const { return isList; }
@@ -239,7 +239,7 @@ public:
         };
         
         // Properties in the requestTable share the same cursor
-        DataCursor * cursor = new DataCursor();
+        DataCursor * cursor = new DataCursor(); // @tofix mem leak
         std::vector<uint32_t> instanceCounts;
                    
         for (auto requestedProperty : requestTable)
@@ -249,8 +249,8 @@ public:
             if (instanceCount)
             {
                 instanceCounts.push_back(instanceCount);
-                auto ret = userDataMap.insert(std::pair<std::string, DataCursor * >(requestedProperty, cursor));
-                if (ret.second == false)
+                auto result = userDataMap.insert(std::pair<std::string, DataCursor * >(requestedProperty, cursor));
+                if (result.second == false)
                     throw std::runtime_error("cannot request the same property twice: " + requestedProperty);
             }
             else
@@ -275,6 +275,32 @@ public:
         }
 
         return totalInstanceSize;
+    }
+    
+    PlyElement & add_element(PlyElement element)
+    {
+        elements.push_back(element);
+        return elements.back();
+    }
+    
+    PlyProperty & add_property_to_element(PlyElement & element, PlyProperty property)
+    {
+        element.get_properties().push_back(property);
+        return element.get_properties().back();
+    }
+    
+    template<typename T>
+    int set_data_for_properties(std::vector<std::string> propKeys, std::vector<T> & source)
+    {
+        DataCursor * cursor = {source.data(), 0};
+        std::vector<uint32_t> instanceCounts;
+        
+        for (auto p : propKeys)
+        {
+            //@todo check if a real property in one of the elements
+            auto result = userDataMap.insert(std::pair<std::string, DataCursor * >(p, cursor));
+
+        }
     }
     
     std::vector<PlyElement> & get_elements() { return elements; }
