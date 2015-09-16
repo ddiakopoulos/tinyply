@@ -103,12 +103,6 @@ inline int stride_for_property(PlyProperty::Type t)
     }
 }
 
-inline void upsert_vector(std::string & str, std::vector<std::string> & vector)
-{
-    if (std::find(vector.begin(), vector.end(), str) == vector.end())
-        vector.push_back(str);
-}
-
 template<typename T>
 void ply_cast(void * dest, const uint8_t * src)
 {
@@ -227,7 +221,12 @@ public:
         }
         
         if (foundElement)
-            upsert_vector(element, requestedElements);
+        {
+            if (std::find(requestedElements.begin(), requestedElements.end(), element) == requestedElements.end())
+            {
+               requestedElements.push_back(element);
+            }
+        }
         else
             throw std::invalid_argument("requested unknown element: " + element);
 
