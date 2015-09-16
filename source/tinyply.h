@@ -14,18 +14,6 @@
 #include <map>
 #include <iostream>
 #include <sstream>
-#include <fstream>
-
-///////////////
-// Debug Ops //
-///////////////
-
-#ifdef _DEBUG
-#include <assert.h>
-#define ply_assert(expression) assert(expression)
-#else
-#define ply_assert(expression)
-#endif
 
 namespace tinyply
 {
