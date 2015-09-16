@@ -24,7 +24,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		08BA030F1B5576730062FBAB /* temp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = temp.h; sourceTree = SOURCE_ROOT; };
 		08BD62131B52B1A00004E704 /* example.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = example.cpp; sourceTree = "<group>"; };
 		08F35A821B414DED00EB7A72 /* tinyply */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tinyply; sourceTree = BUILT_PRODUCTS_DIR; };
 		08F35A951B414E2B00EB7A72 /* tinyply.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tinyply.cpp; sourceTree = "<group>"; };
@@ -45,7 +44,6 @@
 		08BD62151B52B1AA0004E704 /* tinyply */ = {
 			isa = PBXGroup;
 			children = (
-				08BA030F1B5576730062FBAB /* temp.h */,
 				08F35A951B414E2B00EB7A72 /* tinyply.cpp */,
 				08F35A961B414E2B00EB7A72 /* tinyply.h */,
 			);
