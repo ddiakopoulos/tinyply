@@ -62,10 +62,14 @@ int main(int argc, char *argv[])
     
     PlyFile myFile;
     
+    std::vector<float> verts;
+    std::vector<uint32_t> faces;
+    
+    verts = { 1.0,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,-1.0 };
+    faces = { 0, 2, 4, 0, 4, 3, 0, 3, 5, 0, 5, 2, 1, 2, 5, 1, 5, 3, 1, 3, 4, 1, 2, 4 };
+    
     myFile.write(outputStream);
-    
     outFile << outputStream.str();
-    
     outFile.close();
     
     /*
