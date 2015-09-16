@@ -297,22 +297,26 @@ public:
         return totalInstanceSize;
     }
     
-    PlyElement & add_element(PlyElement element)
+    void add_element(PlyElement element)
     {
         elements.push_back(element);
-        return elements.back();
     }
     
-    PlyProperty & add_property_to_element(PlyElement & element, PlyProperty property)
+    void add_property_to_element(std::string elementKey, PlyProperty property)
     {
-        element.get_properties().push_back(property);
-        return element.get_properties().back();
+        for (auto & e : elements)
+        {
+            if (e.get_name() == elementKey)
+                e.get_properties().push_back(property);
+        }
     }
     
     template<typename T>
     int set_data_for_properties(std::vector<std::string> propKeys, std::vector<T> & source)
     {
-        DataCursor * cursor = {source.data(), 0};
+        DataCursor * cursor = new DataCursor();
+        cursor->data = reinterpret_cast<uint8_t *>(source.data());
+        cursor->offset = 0;
         std::vector<uint32_t> instanceCounts;
         
         for (auto p : propKeys)
@@ -321,6 +325,7 @@ public:
             auto result = userDataMap.insert(std::pair<std::string, DataCursor * >(p, cursor));
 
         }
+        return 100;
     }
     
     std::vector<PlyElement> & get_elements() { return elements; }

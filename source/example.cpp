@@ -68,6 +68,18 @@ int main(int argc, char *argv[])
     verts = { 1.0,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,-1.0 };
     faces = { 0, 2, 4, 0, 4, 3, 0, 3, 5, 0, 5, 2, 1, 2, 5, 1, 5, 3, 1, 3, 4, 1, 2, 4 };
     
+    myFile.add_element({"vertices", static_cast<int>(verts.size())});
+    myFile.add_element({"faces", static_cast<int>(faces.size())});
+    
+    myFile.add_property_to_element("vertices", {PlyProperty::Type::FLOAT32, "x"});
+    myFile.add_property_to_element("vertices", {PlyProperty::Type::FLOAT32, "y"});
+    myFile.add_property_to_element("vertices", {PlyProperty::Type::FLOAT32, "z"});
+    
+    myFile.add_property_to_element("faces", {PlyProperty::Type::UINT8, PlyProperty::Type::UINT32, "vertex_indices"});
+    
+    myFile.set_data_for_properties({"x", "y", "z"}, verts);
+    myFile.set_data_for_properties({"vertex_indices"}, faces);
+    
     myFile.write(outputStream);
     outFile << outputStream.str();
     outFile.close();
