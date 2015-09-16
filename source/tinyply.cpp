@@ -140,9 +140,9 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
     {
         if (std::find(requestedElements.begin(), requestedElements.end(), element.get_name()) != requestedElements.end())
         {
-            for (int64_t elementCount = 0; elementCount < element.get_element_count(); ++elementCount)
+            for (int64_t count = 0; count < element.get_element_count(); ++count)
             {
-                for (auto & property : element.get_properties())
+                for (const auto & property : element.get_properties())
                 {
                     auto token = property.get_name();
                     auto listType = property.get_list_type();
@@ -181,10 +181,9 @@ void PlyFile::parse_data_ascii(std::istream & is, const std::vector<uint8_t> & b
     {
         if (std::find(requestedElements.begin(), requestedElements.end(), element.get_name()) != requestedElements.end())
         {
-            // How many of them?
-            for (int64_t elementCount = 0; elementCount < element.get_element_count(); ++elementCount)
+            for (int64_t count = 0; count < element.get_element_count(); ++count)
             {
-                for (auto & property : element.get_properties())
+                for (const auto & property : element.get_properties())
                 {
                     auto token = property.get_name();
                     auto listType = property.get_list_type();
