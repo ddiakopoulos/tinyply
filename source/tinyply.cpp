@@ -50,12 +50,12 @@ PlyProperty::Type PlyProperty::get_data_type(const string & t)
 // PLY Element //
 /////////////////
 
-PlyElement::PlyElement(std::istream& is)
+PlyElement::PlyElement(std::istream & is)
 {
     parse_internal(is);
 }
 
-void PlyElement::parse_internal(std::istream& is)
+void PlyElement::parse_internal(std::istream & is)
 {
     is >> name >> size;
 }
@@ -64,7 +64,7 @@ void PlyElement::parse_internal(std::istream& is)
 // PLY File //
 //////////////
 
-PlyFile::PlyFile(std::istream& is)
+PlyFile::PlyFile(std::istream & is)
 {
     parse_header(is);
 }
@@ -128,6 +128,46 @@ void PlyFile::parse(std::istream & is, const std::vector<uint8_t> & buffer)
 {
     if (isBinary) parse_data_binary(is, buffer);
     else parse_data_ascii(is, buffer);
+}
+
+void PlyFile::write(std::ostringstream & os)
+{
+    write_header(os);
+    // write data
+}
+
+void PlyFile::write_header(std::ostringstream & os)
+{
+    const std::locale & fixLoc = std::locale("C");
+    os.imbue(fixLoc);
+    
+    os << "ply" << std::endl;
+    if (isBinary)
+        os << ((isBigEndian) ? "format binary_big_endian 1.0" : "format binary_little_endian 1.0") << std::endl;
+    else
+        os << "format ascii 1.0" << std::endl;
+    
+    for (const auto & comment : comments)
+        os << "comment " << comment << std::endl;
+    
+    for (auto & e : elements)
+    {
+        os << "element " << e.get_name() << " " << e.get_element_count() << std::endl;
+        for (const auto & p : e.get_properties())
+        {
+            if (p.is_list())
+            {
+              os << "property list " << property_type_as_string(p.get_list_type()) << " " <<
+                property_type_as_string(p.get_property_type()) << " " << p.get_name() << std::endl;
+            }
+            else
+            {
+                os << "property " << property_type_as_string(p.get_property_type()) << " " << p.get_name() << std::endl;
+            }
+        }
+    }
+    
+    os << "end_header" << std::endl;
 }
 
 void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & buffer)

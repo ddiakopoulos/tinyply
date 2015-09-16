@@ -42,7 +42,9 @@ static inline uint64_t swap_64(uint64_t value)
             ((value & 0x00ff000000000000LL) >> 40) |
             ((value & 0xff00000000000000LL) >> 56));
 }
-    
+
+// Read: byte buffer, byte offset
+// Write: data location, number of elements
 struct DataCursor
 {
     uint8_t * data;
@@ -100,6 +102,22 @@ inline int stride_for_property(PlyProperty::Type t)
         case PlyProperty::Type::FLOAT32:    return 4;
         case PlyProperty::Type::FLOAT64:    return 8;
         default: return 0;
+    }
+}
+    
+inline std::string property_type_as_string(PlyProperty::Type t)
+{
+    switch(t)
+    {
+        case PlyProperty::Type::INT8:       return "char";
+        case PlyProperty::Type::UINT8:      return "uchar";
+        case PlyProperty::Type::INT16:      return "short";
+        case PlyProperty::Type::UINT16:     return "ushort";
+        case PlyProperty::Type::INT32:      return "int";
+        case PlyProperty::Type::UINT32:     return "uint";
+        case PlyProperty::Type::FLOAT32:    return "float";
+        case PlyProperty::Type::FLOAT64:    return "double";
+        default: return "";
     }
 }
 
@@ -200,9 +218,11 @@ class PlyFile
 {
 public:
     
+    PlyFile() {}
     PlyFile(std::istream & is);
 
     void parse(std::istream & is, const std::vector<uint8_t> & buffer);
+    void write(std::ostringstream & os);
     
     std::vector<std::string> comments;
     std::vector<std::string> objInfo;
@@ -316,8 +336,11 @@ private:
     void read_header_property(std::istream & is);
     void read_header_text(std::string line, std::istream & is, std::vector<std::string> place, int erase = 0);
     
+    void write_header(std::ostringstream & os);
+    
     std::vector<PlyElement> elements;
-    bool isBinary;
+    bool isBinary = false;
+    bool isBigEndian = false;
     PropertyMapType userDataMap;
     std::vector<std::string> requestedElements;
 };

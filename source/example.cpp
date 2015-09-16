@@ -56,6 +56,19 @@ int main(int argc, char *argv[])
     // large/xyzrgb_dragon.ply
     // icosahedron_ascii.ply
     
+    
+    std::ofstream outFile("test_header.ply");
+    std::ostringstream outputStream;
+    
+    PlyFile myFile;
+    
+    myFile.write(outputStream);
+    
+    outFile << outputStream.str();
+    
+    outFile.close();
+    
+    /*
     auto f = read_file_binary("assets/icosahedron.ply");
     std::istringstream ss((char*)f.data(), std::ios::binary);
     
@@ -93,6 +106,7 @@ int main(int argc, char *argv[])
     {
         std::cerr << "Caught exception: " << e.what() << std::endl;
     }
+    */
     
     return 0;
 }
