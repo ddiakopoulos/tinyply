@@ -167,7 +167,6 @@ void PlyFile::write(std::ostringstream & os, bool binary)
             }
         }
     }
-
 }
 
 void PlyFile::write(std::ostringstream & os)
@@ -229,7 +228,6 @@ void PlyFile::write_header(std::ostringstream & os)
             }
         }
     }
-    
     os << "end_header" << std::endl;
 }
 

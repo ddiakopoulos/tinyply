@@ -373,7 +373,6 @@ public:
             add_to_element(newElement);
             elements.push_back(newElement);
         }
-
     }
     
     std::vector<PlyElement> & get_elements() { return elements; }
