@@ -14,6 +14,7 @@
 #include <map>
 #include <iostream>
 #include <sstream>
+#include <type_traits>
 
 namespace tinyply
 {
@@ -43,12 +44,10 @@ static inline uint64_t swap_64(uint64_t value)
             ((value & 0xff00000000000000LL) >> 56));
 }
 
-// Read: byte buffer, byte offset
-// Write: data location, number of elements
 struct DataCursor
 {
     uint8_t * data;
-    size_t offset;
+    uint32_t offset;
 };
 
 typedef std::map<std::string, DataCursor *> PropertyMapType;
@@ -72,13 +71,15 @@ public:
     
     PlyProperty(std::istream& is);
     PlyProperty(Type type, const std::string & name) : propertyType(type), isList(false), name(name) {}
-    PlyProperty(Type list_type, Type prop_type, const std::string & name) : listType(list_type), propertyType(prop_type), isList(true), name(name) {}
+    PlyProperty(Type list_type, Type prop_type, const std::string & name, int stride) : listType(list_type), propertyType(prop_type), isList(true), name(name), stride(stride) {}
     
     const std::string & get_name() const { return name; }
     bool is_list() const { return isList; }
     Type get_list_type() const { return listType; }
     Type get_property_type() const { return propertyType; }
-
+    
+    int stride;
+    
 private:
     
     void parse_internal(std::istream & is);
@@ -89,6 +90,40 @@ private:
     std::string name;
 };
 
+template<typename T>
+void ply_cast(void * dest, const uint8_t * src)
+{
+    *(static_cast<T *>(dest)) = *(reinterpret_cast<const T *>(src));
+}
+
+template<typename T>
+T ply_read_ascii(std::istream & is)
+{
+    T data;
+    is >> data;
+    return data;
+}
+
+template<typename T>
+void ply_cast_ascii(void * dest, std::istream & is)
+{
+    *(static_cast<T *>(dest)) = ply_read_ascii<T>(is);
+}
+    
+template <typename T>
+inline PlyProperty::Type property_type_for_type(std::vector<T> & theType)
+{
+    if (std::is_same<T, int8_t>::value)     return PlyProperty::Type::INT8;
+    if (std::is_same<T, uint8_t>::value)    return PlyProperty::Type::UINT8;
+    if (std::is_same<T, int16_t>::value)    return PlyProperty::Type::INT16;
+    if (std::is_same<T, uint16_t>::value)   return PlyProperty::Type::UINT16;
+    if (std::is_same<T, int32_t>::value)    return PlyProperty::Type::INT32;
+    if (std::is_same<T, uint32_t>::value)   return PlyProperty::Type::UINT32;
+    if (std::is_same<T, float>::value)      return PlyProperty::Type::FLOAT32;
+    if (std::is_same<T, double>::value)     return PlyProperty::Type::FLOAT64;
+    else return PlyProperty::Type::INVALID;
+}
+    
 inline int stride_for_property(PlyProperty::Type t)
 {
     switch(t)
@@ -120,28 +155,8 @@ inline std::string property_type_as_string(PlyProperty::Type t)
         default: return "";
     }
 }
-
-template<typename T>
-void ply_cast(void * dest, const uint8_t * src)
-{
-    *(static_cast<T *>(dest)) = *(reinterpret_cast<const T *>(src));
-}
     
-template<typename T>
-T ply_read_ascii(std::istream & is)
-{
-    T data;
-    is >> data;
-    return data;
-}
-
-template<typename T>
-void ply_cast_ascii(void * dest, std::istream & is)
-{
-    *(static_cast<T *>(dest)) = ply_read_ascii<T>(is);
-}
-
-inline void read_property(PlyProperty::Type t, void * dest, size_t & destOffset, const uint8_t * src, uint32_t & srcOffset)
+inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, const uint8_t * src, uint32_t & srcOffset)
 {
     switch (t)
     {
@@ -159,7 +174,7 @@ inline void read_property(PlyProperty::Type t, void * dest, size_t & destOffset,
     srcOffset += stride_for_property(t);
 }
 
-inline void read_property(PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is)
+inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is)
 {
     switch (t)
     {
@@ -176,12 +191,37 @@ inline void read_property(PlyProperty::Type t, void * dest, size_t & destOffset,
     destOffset += stride_for_property(t);
 }
     
+inline void write_property(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
+{
+    
+    switch (t)
+    {
+        case PlyProperty::Type::INT8:       os << *reinterpret_cast<int8_t*>(src);      break;
+        case PlyProperty::Type::UINT8:      os << *reinterpret_cast<uint8_t*>(src);     break;
+        case PlyProperty::Type::INT16:      os << *reinterpret_cast<int16_t*>(src);     break;
+        case PlyProperty::Type::UINT16:     os << *reinterpret_cast<uint16_t*>(src);    break;
+        case PlyProperty::Type::INT32:      os << *reinterpret_cast<int32_t*>(src);     break;
+        case PlyProperty::Type::UINT32:     os << *reinterpret_cast<uint32_t*>(src);    break;
+        case PlyProperty::Type::FLOAT32:    os << *reinterpret_cast<float*>(src);       break;
+        case PlyProperty::Type::FLOAT64:    os << *reinterpret_cast<double*>(src);      break;
+        case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
+    }
+    os << " ";
+    srcOffset += stride_for_property(t);
+}
+    
+inline void write_property_binary(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
+{
+    os.write(reinterpret_cast<const char *>(src), stride_for_property(t));
+    srcOffset += stride_for_property(t);
+}
+
 inline void skip_property(uint32_t & fileOffset, const PlyProperty & property, const uint8_t * src)
 {
     if (property.is_list())
     {
         uint32_t listSize = 0;
-        size_t dummyCount = 0;
+        uint32_t dummyCount = 0;
         read_property(property.get_list_type(), &listSize, dummyCount, src, fileOffset);
         for (int i = 0; i < listSize; ++i) fileOffset += stride_for_property(property.get_property_type());
     } fileOffset += stride_for_property(property.get_property_type());
@@ -222,7 +262,9 @@ public:
     PlyFile(std::istream & is);
 
     void parse(std::istream & is, const std::vector<uint8_t> & buffer);
+    
     void write(std::ostringstream & os);
+    void write(std::ostringstream & os, bool binary);
     
     std::vector<std::string> comments;
     std::vector<std::string> objInfo;
@@ -297,35 +339,41 @@ public:
         return totalInstanceSize;
     }
     
-    void add_element(PlyElement element)
-    {
-        elements.push_back(element);
-    }
-    
-    void add_property_to_element(std::string elementKey, PlyProperty property)
-    {
-        for (auto & e : elements)
-        {
-            if (e.get_name() == elementKey)
-                e.get_properties().push_back(property);
-        }
-    }
-    
     template<typename T>
-    int set_data_for_properties(std::vector<std::string> propKeys, std::vector<T> & source)
+    void add_properties_to_element(std::string elementKey, std::vector<std::string> props, std::vector<T> & source, PlyProperty::Type listType = PlyProperty::Type::INVALID, int listStride = 0)
     {
         DataCursor * cursor = new DataCursor();
         cursor->data = reinterpret_cast<uint8_t *>(source.data());
         cursor->offset = 0;
-        std::vector<uint32_t> instanceCounts;
         
-        for (auto p : propKeys)
+        auto add_to_element = [&](PlyElement & ele)
         {
-            //@todo check if a real property in one of the elements
-            auto result = userDataMap.insert(std::pair<std::string, DataCursor * >(p, cursor));
-
+            for (auto p : props)
+            {
+                PlyProperty::Type t = property_type_for_type(source);
+                PlyProperty newProp = (listType == PlyProperty::Type::INVALID) ? PlyProperty(t, p) : PlyProperty(listType, t, p, listStride);
+                userDataMap.insert(std::pair<std::string, DataCursor * >(p, cursor));
+                ele.get_properties().push_back(newProp);
+            }
+        };
+        
+        bool foundElement = false;
+        for (auto & e : elements)
+        {
+            if (e.get_name() == elementKey)
+            {
+                add_to_element(e);
+                foundElement = true;
+            }
         }
-        return 100;
+        
+        if (foundElement == false)
+        {
+            PlyElement newElement = listStride == 0 ? PlyElement(elementKey, (int) source.size() / (int) props.size()) : PlyElement(elementKey, (int) source.size() / listStride);
+            add_to_element(newElement);
+            elements.push_back(newElement);
+        }
+
     }
     
     std::vector<PlyElement> & get_elements() { return elements; }

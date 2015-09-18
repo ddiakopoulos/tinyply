@@ -118,7 +118,7 @@ void PlyFile::read_header_element(std::istream & is)
     get_elements().push_back(e);
 }
 
-void PlyFile::read_header_property(std::istream& is)
+void PlyFile::read_header_property(std::istream & is)
 {
     PlyProperty e(is);
     get_elements().back().get_properties().push_back(e);
@@ -130,10 +130,66 @@ void PlyFile::parse(std::istream & is, const std::vector<uint8_t> & buffer)
     else parse_data_ascii(is, buffer);
 }
 
+void PlyFile::write(std::ostringstream & os, bool binary)
+{
+    isBinary = true;
+    write_header(os);
+    
+    for (auto & e : elements)
+    {
+        for (int i = 0; i < e.get_element_count(); ++i)
+        {
+            for (auto & p : e.get_properties())
+            {
+                auto & cursor = userDataMap[p.get_name()];
+                if (p.is_list())
+                {
+                    uint8_t listSize[4] = {0, 0, 0, 0};
+                    memcpy(listSize, &p.stride, sizeof(uint32_t));
+                    uint32_t dummyCount = 0;
+                    write_property_binary(p.get_list_type(), os, listSize, dummyCount);
+                    for (int j = 0; j < p.stride; ++j)
+                    {
+                        write_property_binary(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
+                    }
+                }
+                else
+                {
+                    write_property_binary(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
+                }
+            }
+        }
+    }
+
+}
+
 void PlyFile::write(std::ostringstream & os)
 {
     write_header(os);
-    // write data
+    
+    for (auto & e : elements)
+    {
+        for (int i = 0; i < e.get_element_count(); ++i)
+        {
+            for (auto & p : e.get_properties())
+            {
+                auto & cursor = userDataMap[p.get_name()];
+                if (p.is_list())
+                {
+                    os << p.stride << " ";
+                    for (int j = 0; j < p.stride; ++j)
+                    {
+                        write_property(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
+                    }
+                }
+                else
+                {
+                    write_property(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
+                }
+            }
+            os << std::endl;
+        }
+    }
 }
 
 void PlyFile::write_header(std::ostringstream & os)
@@ -157,8 +213,8 @@ void PlyFile::write_header(std::ostringstream & os)
         {
             if (p.is_list())
             {
-              os << "property list " << property_type_as_string(p.get_list_type()) << " " <<
-                property_type_as_string(p.get_property_type()) << " " << p.get_name() << std::endl;
+              os << "property list " << property_type_as_string(p.get_list_type()) << " "
+                 << property_type_as_string(p.get_property_type()) << " " << p.get_name() << std::endl;
             }
             else
             {
@@ -194,7 +250,7 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
                         if (property.is_list())
                         {
                             uint32_t listSize = 0;
-                            size_t dummyCount = 0;
+                            uint32_t dummyCount = 0;
                             read_property(listType, &listSize, dummyCount, srcBuffer, fileOffset);
                             for (int i = 0; i < listSize; ++i)
                                 read_property(propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
@@ -234,7 +290,7 @@ void PlyFile::parse_data_ascii(std::istream & is, const std::vector<uint8_t> & b
                         if (property.is_list())
                         {
                             uint32_t listSize = 0;
-                            size_t dummyCount = 0;
+                            uint32_t dummyCount = 0;
                             read_property(listType, &listSize, dummyCount, is);
                             for (int i = 0; i < listSize; ++i)
                             {
