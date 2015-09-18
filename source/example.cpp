@@ -106,7 +106,7 @@ void read_ply_file(const std::string & filename)
         timepoint after = now();
 
         // Good place to put a breakpoint
-        std::cout << "Parsed " << verts.size() << " vertex properties in " << difference_micros(before, after) << "μs" << std::endl;
+        std::cout << "Read " << verts.size() << " vertex properties in " << difference_micros(before, after) << "μs" << std::endl;
         std::cout << "... and " << normals.size() << " normals " << std::endl;
         std::cout << "... and " << faces.size() << " faces " << std::endl;
     }

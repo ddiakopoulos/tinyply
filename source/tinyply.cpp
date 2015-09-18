@@ -66,19 +66,26 @@ void PlyElement::parse_internal(std::istream & is)
 
 PlyFile::PlyFile(std::istream & is)
 {
-    parse_header(is);
+    if (!parse_header(is))
+    {
+        throw std::runtime_error("file is not ply or encounted junk in header");
+    }
 }
 
 bool PlyFile::parse_header(std::istream& is)
 {
     std::string line;
+    bool gotMagic = false;
     while (std::getline(is, line))
     {
         std::istringstream ls(line);
         std::string token;
         ls >> token;
         if (token == "ply" || token == "PLY" || token == "")
+        {
+            gotMagic = true;
             continue;
+        }
         else if (token == "comment")
             read_header_text(line, ls, comments, 7);
         else if (token == "format")
