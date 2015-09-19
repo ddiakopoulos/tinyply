@@ -123,38 +123,19 @@ inline PlyProperty::Type property_type_for_type(std::vector<T> & theType)
     if (std::is_same<T, double>::value)     return PlyProperty::Type::FLOAT64;
     else return PlyProperty::Type::INVALID;
 }
-    
-inline int stride_for_property(PlyProperty::Type t)
+struct PropertyInfo { int stride; std::string str; };
+static std::map<PlyProperty::Type, PropertyInfo> PropertyTable
 {
-    switch(t)
-    {
-        case PlyProperty::Type::INT8:       return 1;
-        case PlyProperty::Type::UINT8:      return 1;
-        case PlyProperty::Type::INT16:      return 2;
-        case PlyProperty::Type::UINT16:     return 2;
-        case PlyProperty::Type::INT32:      return 4;
-        case PlyProperty::Type::UINT32:     return 4;
-        case PlyProperty::Type::FLOAT32:    return 4;
-        case PlyProperty::Type::FLOAT64:    return 8;
-        default: return 0;
-    }
-}
-    
-inline std::string property_type_as_string(PlyProperty::Type t)
-{
-    switch(t)
-    {
-        case PlyProperty::Type::INT8:       return "char";
-        case PlyProperty::Type::UINT8:      return "uchar";
-        case PlyProperty::Type::INT16:      return "short";
-        case PlyProperty::Type::UINT16:     return "ushort";
-        case PlyProperty::Type::INT32:      return "int";
-        case PlyProperty::Type::UINT32:     return "uint";
-        case PlyProperty::Type::FLOAT32:    return "float";
-        case PlyProperty::Type::FLOAT64:    return "double";
-        default: return "";
-    }
-}
+    {PlyProperty::Type::INT8,       {1, "char"}},
+    {PlyProperty::Type::UINT8,      {1, "uchar"}},
+    {PlyProperty::Type::INT16,      {2, "short"}},
+    {PlyProperty::Type::UINT16,     {2, "ushort"}},
+    {PlyProperty::Type::INT32,      {4, "int"}},
+    {PlyProperty::Type::UINT32,     {4, "uint"}},
+    {PlyProperty::Type::FLOAT32,    {4, "float"}},
+    {PlyProperty::Type::FLOAT64,    {8, "double"}},
+    {PlyProperty::Type::INVALID,    {0, "INVALID"}}
+};
     
 inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, const uint8_t * src, uint32_t & srcOffset)
 {
@@ -170,8 +151,8 @@ inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffse
         case PlyProperty::Type::FLOAT64:    ply_cast<double>(dest, src + srcOffset);    break;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
-    destOffset += stride_for_property(t);
-    srcOffset += stride_for_property(t);
+    destOffset += PropertyTable[t].stride;
+    srcOffset += PropertyTable[t].stride;
 }
 
 inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is)
@@ -188,7 +169,7 @@ inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffse
         case PlyProperty::Type::FLOAT64:    ply_cast_ascii<double>(dest, is);                       break;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
-    destOffset += stride_for_property(t);
+    destOffset += PropertyTable[t].stride;
 }
     
 inline void write_property_ascii(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
@@ -206,13 +187,13 @@ inline void write_property_ascii(PlyProperty::Type t, std::ostringstream & os, u
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
     os << " ";
-    srcOffset += stride_for_property(t);
+    srcOffset += PropertyTable[t].stride;
 }
     
 inline void write_property_binary(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
 {
-    os.write(reinterpret_cast<const char *>(src), stride_for_property(t));
-    srcOffset += stride_for_property(t);
+    os.write(reinterpret_cast<const char *>(src), PropertyTable[t].stride);
+    srcOffset += PropertyTable[t].stride;
 }
 
 inline void skip_property(uint32_t & fileOffset, const PlyProperty & property, const uint8_t * src)
@@ -222,8 +203,9 @@ inline void skip_property(uint32_t & fileOffset, const PlyProperty & property, c
         uint32_t listSize = 0;
         uint32_t dummyCount = 0;
         read_property(property.get_list_type(), &listSize, dummyCount, src, fileOffset);
-        for (int i = 0; i < listSize; ++i) fileOffset += stride_for_property(property.get_property_type());
-    } fileOffset += stride_for_property(property.get_property_type());
+        for (int i = 0; i < listSize; ++i) fileOffset += PropertyTable[property.get_property_type()].stride;
+    }
+    fileOffset += PropertyTable[property.get_property_type()].stride;
 }
     
 inline void skip_property(std::istream & is, const PlyProperty & property)

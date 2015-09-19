@@ -224,12 +224,12 @@ void PlyFile::write_header(std::ostringstream & os)
         {
             if (p.is_list())
             {
-              os << "property list " << property_type_as_string(p.get_list_type()) << " "
-                 << property_type_as_string(p.get_property_type()) << " " << p.get_name() << std::endl;
+              os << "property list " << PropertyTable[p.get_list_type()].str << " "
+                 << PropertyTable[p.get_property_type()].str << " " << p.get_name() << std::endl;
             }
             else
             {
-                os << "property " << property_type_as_string(p.get_property_type()) << " " << p.get_name() << std::endl;
+                os << "property " << PropertyTable[p.get_property_type()].str << " " << p.get_name() << std::endl;
             }
         }
     }
