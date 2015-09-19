@@ -91,20 +91,13 @@ bool PlyFile::parse_header(std::istream& is)
             gotMagic = true;
             continue;
         }
-        else if (token == "comment")
-            read_header_text(line, ls, comments, 7);
-        else if (token == "format")
-            read_header_format(ls);
-        else if (token == "element")
-            read_header_element(ls);
-        else if (token == "property")
-            read_header_property(ls);
-        else if (token == "obj_info")
-            read_header_text(line, ls, objInfo, 7);
-        else if (token == "end_header")
-            break;
-        else
-            return false;
+        else if (token == "comment")    read_header_text(line, ls, comments, 7);
+        else if (token == "format")     read_header_format(ls);
+        else if (token == "element")    read_header_element(ls);
+        else if (token == "property")   read_header_property(ls);
+        else if (token == "obj_info")   read_header_text(line, ls, objInfo, 7);
+        else if (token == "end_header") break;
+        else return false;
     }
     return true;
 }
