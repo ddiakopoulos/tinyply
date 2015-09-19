@@ -191,7 +191,7 @@ inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffse
     destOffset += stride_for_property(t);
 }
     
-inline void write_property(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
+inline void write_property_ascii(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
 {
     switch (t)
     {

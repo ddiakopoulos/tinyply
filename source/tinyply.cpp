@@ -190,12 +190,12 @@ void PlyFile::write(std::ostringstream & os)
                     os << p.stride << " ";
                     for (int j = 0; j < p.stride; ++j)
                     {
-                        write_property(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
+                        write_property_ascii(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
                     }
                 }
                 else
                 {
-                    write_property(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
+                    write_property_ascii(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
                 }
             }
             os << std::endl;
