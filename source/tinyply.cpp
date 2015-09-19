@@ -153,7 +153,7 @@ void PlyFile::write(std::ostringstream & os, bool binary)
         {
             for (auto & p : e.get_properties())
             {
-                auto & cursor = userDataMap[p.get_name()];
+                auto & cursor = userDataTable[p.get_name()];
                 if (p.is_list())
                 {
                     uint8_t listSize[4] = {0, 0, 0, 0};
@@ -184,7 +184,7 @@ void PlyFile::write(std::ostringstream & os)
         {
             for (auto & p : e.get_properties())
             {
-                auto & cursor = userDataMap[p.get_name()];
+                auto & cursor = userDataTable[p.get_name()];
                 if (p.is_list())
                 {
                     os << p.stride << " ";
@@ -254,9 +254,9 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
                     auto listType = property.get_list_type();
                     auto propertyType = property.get_property_type();
                     
-                    if (userDataMap[token])
+                    if (userDataTable[token])
                     {
-                        auto & cursor = userDataMap[token];
+                        auto & cursor = userDataTable[token];
                         if (property.is_list())
                         {
                             uint32_t listSize = 0;
@@ -294,9 +294,9 @@ void PlyFile::parse_data_ascii(std::istream & is, const std::vector<uint8_t> & b
                     auto token = property.get_name();
                     auto listType = property.get_list_type();
                     auto propertyType = property.get_property_type();
-                    if (userDataMap[token])
+                    if (userDataTable[token])
                     {
-                        auto & cursor = userDataMap[token];
+                        auto & cursor = userDataTable[token];
                         if (property.is_list())
                         {
                             uint32_t listSize = 0;

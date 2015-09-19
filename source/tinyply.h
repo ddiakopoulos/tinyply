@@ -50,8 +50,6 @@ struct DataCursor
     uint32_t offset;
 };
 
-typedef std::map<std::string, std::shared_ptr<DataCursor>> PropertyMapType;
-    
 class PlyProperty
 {
 public:
@@ -291,7 +289,7 @@ public:
             if (int instanceCount = instance_counter(key))
             {
                 instanceCounts.push_back(instanceCount);
-                auto result = userDataMap.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(key, cursor));
+                auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(key, cursor));
                 if (result.second == false)
                     throw std::runtime_error("property has already been requested: " + key);
             }
@@ -299,7 +297,6 @@ public:
         }
         
         uint32_t totalInstanceSize = [&]() { uint32_t t = 0; for (auto c : instanceCounts) { t += c; } return t; }();
-        
         if ((totalInstanceSize / propertyKeys.size()) == instanceCounts[0])
         {
             source.resize(totalInstanceSize * listCount);
@@ -327,7 +324,7 @@ public:
             {
                 PlyProperty::Type t = property_type_for_type(source);
                 PlyProperty newProp = (listType == PlyProperty::Type::INVALID) ? PlyProperty(t, key) : PlyProperty(listType, t, key, listCount);
-                userDataMap.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(key, cursor));
+                userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(key, cursor));
                 ele.get_properties().push_back(newProp);
             }
         };
@@ -361,10 +358,12 @@ private:
     
     void write_header(std::ostringstream & os);
     
-    std::vector<PlyElement> elements;
     bool isBinary = false;
     bool isBigEndian = false;
-    PropertyMapType userDataMap;
+    
+    std::map<std::string, std::shared_ptr<DataCursor>> userDataTable;
+    
+    std::vector<PlyElement> elements;
     std::vector<std::string> requestedElements;
 };
 
