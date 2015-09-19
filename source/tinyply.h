@@ -237,9 +237,7 @@ public:
     ~PlyFile();
 
     void parse(std::istream & is, const std::vector<uint8_t> & buffer);
-    
-    void write(std::ostringstream & os);
-    void write(std::ostringstream & os, bool binary);
+    void write(std::ostringstream & os, bool isBinary);
     
     std::vector<std::string> comments;
     std::vector<std::string> objInfo;
@@ -335,15 +333,18 @@ public:
 private:
         
     bool parse_header(std::istream & is);
-    void parse_data_binary(std::istream & is, const std::vector<uint8_t> & buffer);
-    void parse_data_ascii(std::istream & is, const std::vector<uint8_t> & buffer);
+    void write_header(std::ostringstream & os);
     
     void read_header_format(std::istream & is);
     void read_header_element(std::istream & is);
     void read_header_property(std::istream & is);
     void read_header_text(std::string line, std::istream & is, std::vector<std::string> place, int erase = 0);
     
-    void write_header(std::ostringstream & os);
+    void parse_data_binary(std::istream & is, const std::vector<uint8_t> & buffer);
+    void parse_data_ascii(std::istream & is, const std::vector<uint8_t> & buffer);
+    
+    void write_ascii_internal(std::ostringstream & os);
+    void write_binary_internal(std::ostringstream & os);
     
     bool isBinary = false;
     bool isBigEndian = false;

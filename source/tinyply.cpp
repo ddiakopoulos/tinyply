@@ -142,7 +142,13 @@ void PlyFile::parse(std::istream & is, const std::vector<uint8_t> & buffer)
     else parse_data_ascii(is, buffer);
 }
 
-void PlyFile::write(std::ostringstream & os, bool binary)
+void PlyFile::write(std::ostringstream & os, bool isBinary)
+{
+    if (isBinary) write_binary_internal(os);
+    else write_ascii_internal(os);
+}
+
+void PlyFile::write_binary_internal(std::ostringstream & os)
 {
     isBinary = true;
     write_header(os);
@@ -174,7 +180,7 @@ void PlyFile::write(std::ostringstream & os, bool binary)
     }
 }
 
-void PlyFile::write(std::ostringstream & os)
+void PlyFile::write_ascii_internal(std::ostringstream & os)
 {
     write_header(os);
     
