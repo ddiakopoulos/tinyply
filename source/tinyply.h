@@ -52,6 +52,7 @@ struct DataCursor
 
 class PlyProperty
 {
+    void parse_internal(std::istream & is);
 public:
     
     enum class Type : uint8_t
@@ -69,22 +70,12 @@ public:
     
     PlyProperty(std::istream& is);
     PlyProperty(Type type, const std::string & name) : propertyType(type), isList(false), name(name) {}
-    PlyProperty(Type list_type, Type prop_type, const std::string & name, int stride) : listType(list_type), propertyType(prop_type), isList(true), name(name), stride(stride) {}
-    
-    const std::string & get_name() const { return name; }
-    bool is_list() const { return isList; }
-    Type get_list_type() const { return listType; }
-    Type get_property_type() const { return propertyType; }
-    
-    int stride;
-    
-private:
-    
-    void parse_internal(std::istream & is);
-    Type get_data_type(const std::string & string);
+    PlyProperty(Type list_type, Type prop_type, const std::string & name, int listCount) : listType(list_type), propertyType(prop_type), isList(true), name(name), listCount(listCount) {}
+    PlyProperty::Type get_data_type(const std::string & t);
     
     Type listType, propertyType;
     bool isList;
+    int listCount;
     std::string name;
 };
 
@@ -196,20 +187,20 @@ inline void write_property_binary(PlyProperty::Type t, std::ostringstream & os, 
 
 inline void skip_property(uint32_t & fileOffset, const PlyProperty & property, const uint8_t * src)
 {
-    if (property.is_list())
+    if (property.isList)
     {
         uint32_t listSize = 0;
         uint32_t dummyCount = 0;
-        read_property(property.get_list_type(), &listSize, dummyCount, src, fileOffset);
-        for (int i = 0; i < listSize; ++i) fileOffset += PropertyTable[property.get_property_type()].stride;
+        read_property(property.listType, &listSize, dummyCount, src, fileOffset);
+        for (int i = 0; i < listSize; ++i) fileOffset += PropertyTable[property.propertyType].stride;
     }
-    fileOffset += PropertyTable[property.get_property_type()].stride;
+    fileOffset += PropertyTable[property.propertyType].stride;
 }
     
 inline void skip_property(std::istream & is, const PlyProperty & property)
 {
     std::string skip;
-    if (property.is_list())
+    if (property.isList)
     {
         int listSize;
         is >> listSize;
@@ -220,14 +211,10 @@ inline void skip_property(std::istream & is, const PlyProperty & property)
 
 class PlyElement
 {
+    void parse_internal(std::istream & istream);
 public:
     PlyElement(std::istream & istream);
     PlyElement(const std::string & name, int count) : name(name), size(count) {}
-    const std::string & get_name() const { return name; }
-    int get_element_count() const { return size; }
-    std::vector<PlyProperty> & get_properties() { return properties; }
-private:
-    void parse_internal(std::istream & istream);
     std::string name;
     int size;
     std::vector<PlyProperty> properties;
@@ -237,7 +224,7 @@ inline int find_element(const std::string key, std::vector<PlyElement> & list)
 {
     for (int i = 0; i < list.size(); ++i)
     {
-        if (list[i].get_name() == key) return i;
+        if (list[i].name == key) return i;
     }
     return -1;
 }
@@ -275,8 +262,8 @@ public:
         auto instance_counter = [&](const std::string & prop)
         {
             for (auto e : get_elements())
-                for (auto p : e.get_properties())
-                    if (p.get_name() == prop) return e.get_element_count();
+                for (auto p : e.properties)
+                    if (p.name == prop) return e.size;
             return 0;
         };
         
@@ -325,7 +312,7 @@ public:
                 PlyProperty::Type t = property_type_for_type(source);
                 PlyProperty newProp = (listType == PlyProperty::Type::INVALID) ? PlyProperty(t, key) : PlyProperty(listType, t, key, listCount);
                 userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(key, cursor));
-                ele.get_properties().push_back(newProp);
+                ele.properties.push_back(newProp);
             }
         };
         

@@ -90,10 +90,10 @@ void read_ply_file(const std::string & filename)
 
         for (auto e : file.get_elements())
         {
-            std::cout << "element - " << e.get_name() << " (" << e.get_element_count() << ")" << std::endl;
-            for (auto p : e.get_properties())
+            std::cout << "element - " << e.name << " (" << e.size << ")" << std::endl;
+            for (auto p : e.properties)
             {
-                std::cout << "\t property - " << p.get_name() << std::endl;
+                std::cout << "\t property - " << p.name << std::endl;
             }
         }
         std::cout << std::endl;

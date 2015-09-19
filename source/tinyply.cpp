@@ -133,7 +133,7 @@ void PlyFile::read_header_element(std::istream & is)
 void PlyFile::read_header_property(std::istream & is)
 {
     PlyProperty e(is);
-    get_elements().back().get_properties().push_back(e);
+    get_elements().back().properties.push_back(e);
 }
 
 void PlyFile::parse(std::istream & is, const std::vector<uint8_t> & buffer)
@@ -149,25 +149,25 @@ void PlyFile::write(std::ostringstream & os, bool binary)
     
     for (auto & e : elements)
     {
-        for (int i = 0; i < e.get_element_count(); ++i)
+        for (int i = 0; i < e.size; ++i)
         {
-            for (auto & p : e.get_properties())
+            for (auto & p : e.properties)
             {
-                auto & cursor = userDataTable[p.get_name()];
-                if (p.is_list())
+                auto & cursor = userDataTable[p.name];
+                if (p.isList)
                 {
                     uint8_t listSize[4] = {0, 0, 0, 0};
-                    memcpy(listSize, &p.stride, sizeof(uint32_t));
+                    memcpy(listSize, &p.listCount, sizeof(uint32_t));
                     uint32_t dummyCount = 0;
-                    write_property_binary(p.get_list_type(), os, listSize, dummyCount);
-                    for (int j = 0; j < p.stride; ++j)
+                    write_property_binary(p.listType, os, listSize, dummyCount);
+                    for (int j = 0; j < p.listCount; ++j)
                     {
-                        write_property_binary(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
+                        write_property_binary(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
                     }
                 }
                 else
                 {
-                    write_property_binary(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
+                    write_property_binary(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
                 }
             }
         }
@@ -180,22 +180,22 @@ void PlyFile::write(std::ostringstream & os)
     
     for (auto & e : elements)
     {
-        for (int i = 0; i < e.get_element_count(); ++i)
+        for (int i = 0; i < e.size; ++i)
         {
-            for (auto & p : e.get_properties())
+            for (auto & p : e.properties)
             {
-                auto & cursor = userDataTable[p.get_name()];
-                if (p.is_list())
+                auto & cursor = userDataTable[p.name];
+                if (p.isList)
                 {
-                    os << p.stride << " ";
-                    for (int j = 0; j < p.stride; ++j)
+                    os << p.listCount << " ";
+                    for (int j = 0; j < p.listCount; ++j)
                     {
-                        write_property_ascii(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
+                        write_property_ascii(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
                     }
                 }
                 else
                 {
-                    write_property_ascii(p.get_property_type(), os, (cursor->data + cursor->offset), cursor->offset);
+                    write_property_ascii(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
                 }
             }
             os << std::endl;
@@ -219,17 +219,17 @@ void PlyFile::write_header(std::ostringstream & os)
     
     for (auto & e : elements)
     {
-        os << "element " << e.get_name() << " " << e.get_element_count() << std::endl;
-        for (const auto & p : e.get_properties())
+        os << "element " << e.name << " " << e.size << std::endl;
+        for (const auto & p : e.properties)
         {
-            if (p.is_list())
+            if (p.isList)
             {
-              os << "property list " << PropertyTable[p.get_list_type()].str << " "
-                 << PropertyTable[p.get_property_type()].str << " " << p.get_name() << std::endl;
+              os << "property list " << PropertyTable[p.listType].str << " "
+                 << PropertyTable[p.propertyType].str << " " << p.name << std::endl;
             }
             else
             {
-                os << "property " << PropertyTable[p.get_property_type()].str << " " << p.get_name() << std::endl;
+                os << "property " << PropertyTable[p.propertyType].str << " " << p.name << std::endl;
             }
         }
     }
@@ -244,30 +244,26 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
     
     for (auto & element : get_elements())
     {
-        if (std::find(requestedElements.begin(), requestedElements.end(), element.get_name()) != requestedElements.end())
+        if (std::find(requestedElements.begin(), requestedElements.end(), element.name) != requestedElements.end())
         {
-            for (int64_t count = 0; count < element.get_element_count(); ++count)
+            for (int64_t count = 0; count < element.size; ++count)
             {
-                for (const auto & property : element.get_properties())
+                for (const auto & property : element.properties)
                 {
-                    auto token = property.get_name();
-                    auto listType = property.get_list_type();
-                    auto propertyType = property.get_property_type();
-                    
-                    if (userDataTable[token])
+                    if (userDataTable[property.name])
                     {
-                        auto & cursor = userDataTable[token];
-                        if (property.is_list())
+                        auto & cursor = userDataTable[property.name];
+                        if (property.isList)
                         {
                             uint32_t listSize = 0;
                             uint32_t dummyCount = 0;
-                            read_property(listType, &listSize, dummyCount, srcBuffer, fileOffset);
+                            read_property(property.listType, &listSize, dummyCount, srcBuffer, fileOffset);
                             for (int i = 0; i < listSize; ++i)
-                                read_property(propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
+                                read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
                         }
                         else
                         {
-                            read_property(propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
+                            read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
                         }
                     }
                     else
@@ -285,31 +281,28 @@ void PlyFile::parse_data_ascii(std::istream & is, const std::vector<uint8_t> & b
 {
     for (auto & element : get_elements())
     {
-        if (std::find(requestedElements.begin(), requestedElements.end(), element.get_name()) != requestedElements.end())
+        if (std::find(requestedElements.begin(), requestedElements.end(), element.name) != requestedElements.end())
         {
-            for (int64_t count = 0; count < element.get_element_count(); ++count)
+            for (int64_t count = 0; count < element.size; ++count)
             {
-                for (const auto & property : element.get_properties())
+                for (const auto & property : element.properties)
                 {
-                    auto token = property.get_name();
-                    auto listType = property.get_list_type();
-                    auto propertyType = property.get_property_type();
-                    if (userDataTable[token])
+                    if (userDataTable[property.name])
                     {
-                        auto & cursor = userDataTable[token];
-                        if (property.is_list())
+                        auto & cursor = userDataTable[property.name];
+                        if (property.isList)
                         {
                             uint32_t listSize = 0;
                             uint32_t dummyCount = 0;
-                            read_property(listType, &listSize, dummyCount, is);
+                            read_property(property.listType, &listSize, dummyCount, is);
                             for (int i = 0; i < listSize; ++i)
                             {
-                                read_property(propertyType, (cursor->data + cursor->offset), cursor->offset, is);
+                                read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
                             }
                         }
                         else
                         {
-                            read_property(propertyType, (cursor->data + cursor->offset), cursor->offset, is);
+                            read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
                         }
                     }
                     else
