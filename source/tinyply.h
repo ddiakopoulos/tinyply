@@ -71,7 +71,6 @@ public:
     PlyProperty(std::istream& is);
     PlyProperty(Type type, const std::string & name) : propertyType(type), isList(false), name(name) {}
     PlyProperty(Type list_type, Type prop_type, const std::string & name, int listCount) : listType(list_type), propertyType(prop_type), isList(true), name(name), listCount(listCount) {}
-    PlyProperty::Type get_data_type(const std::string & t);
     
     Type listType, propertyType;
     bool isList;
@@ -99,19 +98,6 @@ void ply_cast_ascii(void * dest, std::istream & is)
     *(static_cast<T *>(dest)) = ply_read_ascii<T>(is);
 }
     
-template <typename T>
-inline PlyProperty::Type property_type_for_type(std::vector<T> & theType)
-{
-    if (std::is_same<T, int8_t>::value)     return PlyProperty::Type::INT8;
-    if (std::is_same<T, uint8_t>::value)    return PlyProperty::Type::UINT8;
-    if (std::is_same<T, int16_t>::value)    return PlyProperty::Type::INT16;
-    if (std::is_same<T, uint16_t>::value)   return PlyProperty::Type::UINT16;
-    if (std::is_same<T, int32_t>::value)    return PlyProperty::Type::INT32;
-    if (std::is_same<T, uint32_t>::value)   return PlyProperty::Type::UINT32;
-    if (std::is_same<T, float>::value)      return PlyProperty::Type::FLOAT32;
-    if (std::is_same<T, double>::value)     return PlyProperty::Type::FLOAT64;
-    else return PlyProperty::Type::INVALID;
-}
 struct PropertyInfo { int stride; std::string str; };
 static std::map<PlyProperty::Type, PropertyInfo> PropertyTable
 {
@@ -125,6 +111,34 @@ static std::map<PlyProperty::Type, PropertyInfo> PropertyTable
     {PlyProperty::Type::FLOAT64,    {8, "double"}},
     {PlyProperty::Type::INVALID,    {0, "INVALID"}}
 };
+    
+inline PlyProperty::Type get_data_type(const std::string & t)
+{
+    if      (t == "int8"    || t == "char")     return PlyProperty::Type::INT8;
+    else if (t == "uint8"   || t == "uchar")    return PlyProperty::Type::UINT8;
+    else if (t == "int16"   || t == "short")    return PlyProperty::Type::INT16;
+    else if (t == "uint16"  || t == "ushort")   return PlyProperty::Type::UINT16;
+    else if (t == "int32"   || t == "int")      return PlyProperty::Type::INT32;
+    else if (t == "uint32"  || t == "uint")     return PlyProperty::Type::UINT32;
+    else if (t == "float32" || t == "float")    return PlyProperty::Type::FLOAT32;
+    else if (t == "float64" || t == "double")   return PlyProperty::Type::FLOAT64;
+    return PlyProperty::Type::INVALID;
+}
+
+template <typename T>
+inline PlyProperty::Type property_type_for_type(std::vector<T> & theType)
+{
+    if (std::is_same<T, int8_t>::value)     return PlyProperty::Type::INT8;
+    if (std::is_same<T, uint8_t>::value)    return PlyProperty::Type::UINT8;
+    if (std::is_same<T, int16_t>::value)    return PlyProperty::Type::INT16;
+    if (std::is_same<T, uint16_t>::value)   return PlyProperty::Type::UINT16;
+    if (std::is_same<T, int32_t>::value)    return PlyProperty::Type::INT32;
+    if (std::is_same<T, uint32_t>::value)   return PlyProperty::Type::UINT32;
+    if (std::is_same<T, float>::value)      return PlyProperty::Type::FLOAT32;
+    if (std::is_same<T, double>::value)     return PlyProperty::Type::FLOAT64;
+    else return PlyProperty::Type::INVALID;
+}
+
     
 inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, const uint8_t * src, uint32_t & srcOffset)
 {
@@ -223,9 +237,7 @@ public:
 inline int find_element(const std::string key, std::vector<PlyElement> & list)
 {
     for (int i = 0; i < list.size(); ++i)
-    {
         if (list[i].name == key) return i;
-    }
     return -1;
 }
     
@@ -297,20 +309,20 @@ public:
     }
     
     template<typename T>
-    void add_properties_to_element(std::string elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source, PlyProperty::Type listType = PlyProperty::Type::INVALID, int listCount = 1)
+    void add_properties_to_element(std::string elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source, int listCount = 1, PlyProperty::Type listType = PlyProperty::Type::INVALID)
     {
         auto cursor = std::make_shared<DataCursor>();
         cursor->data = reinterpret_cast<uint8_t *>(source.data());
         cursor->offset = 0;
         
-        auto create_property_on_element = [&](PlyElement & ele)
+        auto create_property_on_element = [&](PlyElement & e)
         {
             for (auto key : propertyKeys)
             {
                 PlyProperty::Type t = property_type_for_type(source);
                 PlyProperty newProp = (listType == PlyProperty::Type::INVALID) ? PlyProperty(t, key) : PlyProperty(listType, t, key, listCount);
                 userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(key, cursor));
-                ele.properties.push_back(newProp);
+                e.properties.push_back(newProp);
             }
         };
         

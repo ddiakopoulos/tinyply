@@ -33,19 +33,6 @@ void PlyProperty::parse_internal(std::istream & is)
     is >> name;
 }
 
-PlyProperty::Type PlyProperty::get_data_type(const string & t)
-{
-    if      (t == "int8"    || t == "char")     return PlyProperty::Type::INT8;
-    else if (t == "uint8"   || t == "uchar")    return PlyProperty::Type::UINT8;
-    else if (t == "int16"   || t == "short")    return PlyProperty::Type::INT16;
-    else if (t == "uint16"  || t == "ushort")   return PlyProperty::Type::UINT16;
-    else if (t == "int32"   || t == "int")      return PlyProperty::Type::INT32;
-    else if (t == "uint32"  || t == "uint")     return PlyProperty::Type::UINT32;
-    else if (t == "float32" || t == "float")    return PlyProperty::Type::FLOAT32;
-    else if (t == "float64" || t == "double")   return PlyProperty::Type::FLOAT64;
-    return PlyProperty::Type::INVALID;
-}
-
 /////////////////
 // PLY Element //
 /////////////////
