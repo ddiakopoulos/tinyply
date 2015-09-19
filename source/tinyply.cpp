@@ -72,6 +72,11 @@ PlyFile::PlyFile(std::istream & is)
     }
 }
 
+PlyFile::~PlyFile()
+{
+    
+}
+
 bool PlyFile::parse_header(std::istream& is)
 {
     std::string line;

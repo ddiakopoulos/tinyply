@@ -50,7 +50,7 @@ struct DataCursor
     uint32_t offset;
 };
 
-typedef std::map<std::string, DataCursor *> PropertyMapType;
+typedef std::map<std::string, std::shared_ptr<DataCursor>> PropertyMapType;
     
 class PlyProperty
 {
@@ -193,7 +193,6 @@ inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffse
     
 inline void write_property(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
 {
-    
     switch (t)
     {
         case PlyProperty::Type::INT8:       os << *reinterpret_cast<int8_t*>(src);      break;
@@ -248,18 +247,27 @@ public:
     int get_element_count() const { return size; }
     std::vector<PlyProperty> & get_properties() { return properties; }
 private:
-    void parse_internal(std::istream& istream);
+    void parse_internal(std::istream & istream);
     std::string name;
     int size;
     std::vector<PlyProperty> properties;
 };
     
+inline int find_element(const std::string key, std::vector<PlyElement> & list)
+{
+    for (int i = 0; i < list.size(); ++i)
+    {
+        if (list[i].get_name() == key) return i;
+    }
+    return -1;
+}
+    
 class PlyFile
 {
 public:
-    
     PlyFile() {}
     PlyFile(std::istream & is);
+    ~PlyFile();
 
     void parse(std::istream & is, const std::vector<uint8_t> & buffer);
     
@@ -270,27 +278,19 @@ public:
     std::vector<std::string> objInfo;
     
     template<typename T>
-    int request_properties_from_element(std::string element, std::vector<std::string> requestTable, std::vector<T> & source)
+    int request_properties_from_element(std::string elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source, uint32_t listCount = 1)
     {
-        if (!get_elements().size())
+        if (get_elements().size() == 0)
             return 0;
         
-        bool foundElement = false;
-        for (auto e : get_elements())
+        if (find_element(elementKey, get_elements()) >= 0)
         {
-            if (e.get_name() == element)
-                foundElement = true;
-        }
-        
-        if (foundElement)
-        {
-            if (std::find(requestedElements.begin(), requestedElements.end(), element) == requestedElements.end())
+            if (std::find(requestedElements.begin(), requestedElements.end(), elementKey) == requestedElements.end())
             {
-               requestedElements.push_back(element);
+                requestedElements.push_back(elementKey);
             }
         }
-        else
-            throw std::invalid_argument("requested unknown element: " + element);
+        else throw std::invalid_argument("requested unknown element: " + elementKey);
 
         auto instance_counter = [&](const std::string & prop)
         {
@@ -301,33 +301,26 @@ public:
         };
         
         // Properties in the requestTable share the same cursor
-        DataCursor * cursor = new DataCursor(); // @tofix mem leak
+        auto cursor = std::make_shared<DataCursor>();
         std::vector<uint32_t> instanceCounts;
                    
-        for (auto requestedProperty : requestTable)
+        for (auto key : propertyKeys)
         {
-            auto instanceCount = instance_counter(requestedProperty);
-            
-            if (instanceCount)
+            if (int instanceCount = instance_counter(key))
             {
                 instanceCounts.push_back(instanceCount);
-                auto result = userDataMap.insert(std::pair<std::string, DataCursor * >(requestedProperty, cursor));
+                auto result = userDataMap.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(key, cursor));
                 if (result.second == false)
-                    throw std::runtime_error("cannot request the same property twice: " + requestedProperty);
+                    throw std::runtime_error("property has already been requested: " + key);
             }
-            else
-                throw std::invalid_argument("requested unknown property: " + requestedProperty);
+            else throw std::invalid_argument("requested unknown property: " + key);
         }
         
         uint32_t totalInstanceSize = [&]() { uint32_t t = 0; for (auto c : instanceCounts) { t += c; } return t; }();
         
-        if ((totalInstanceSize / requestTable.size()) == instanceCounts[0])
+        if ((totalInstanceSize / propertyKeys.size()) == instanceCounts[0])
         {
-            source.resize(totalInstanceSize);
-            
-            //@tofix - bad
-            if (requestTable[0] == "vertex_indices") source.resize(totalInstanceSize * 3);
-            
+            source.resize(totalInstanceSize * listCount);
             cursor->data = reinterpret_cast<uint8_t*>(source.data());
             cursor->offset = 0;
         }
@@ -340,37 +333,33 @@ public:
     }
     
     template<typename T>
-    void add_properties_to_element(std::string elementKey, std::vector<std::string> props, std::vector<T> & source, PlyProperty::Type listType = PlyProperty::Type::INVALID, int listStride = 0)
+    void add_properties_to_element(std::string elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source, PlyProperty::Type listType = PlyProperty::Type::INVALID, int listCount = 1)
     {
-        DataCursor * cursor = new DataCursor();
+        auto cursor = std::make_shared<DataCursor>();
         cursor->data = reinterpret_cast<uint8_t *>(source.data());
         cursor->offset = 0;
         
-        auto add_to_element = [&](PlyElement & ele)
+        auto create_property_on_element = [&](PlyElement & ele)
         {
-            for (auto p : props)
+            for (auto key : propertyKeys)
             {
                 PlyProperty::Type t = property_type_for_type(source);
-                PlyProperty newProp = (listType == PlyProperty::Type::INVALID) ? PlyProperty(t, p) : PlyProperty(listType, t, p, listStride);
-                userDataMap.insert(std::pair<std::string, DataCursor * >(p, cursor));
+                PlyProperty newProp = (listType == PlyProperty::Type::INVALID) ? PlyProperty(t, key) : PlyProperty(listType, t, key, listCount);
+                userDataMap.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(key, cursor));
                 ele.get_properties().push_back(newProp);
             }
         };
         
-        bool foundElement = false;
-        for (auto & e : elements)
+        int idx = find_element(elementKey, elements);
+        if (idx >= 0)
         {
-            if (e.get_name() == elementKey)
-            {
-                add_to_element(e);
-                foundElement = true;
-            }
+            PlyElement & e = elements[idx];
+            create_property_on_element(e);
         }
-        
-        if (foundElement == false)
+        else
         {
-            PlyElement newElement = listStride == 0 ? PlyElement(elementKey, (int) source.size() / (int) props.size()) : PlyElement(elementKey, (int) source.size() / listStride);
-            add_to_element(newElement);
+            PlyElement newElement = listCount == 1 ? PlyElement(elementKey, (int) source.size() / (int) propertyKeys.size()) : PlyElement(elementKey, (int) source.size() / listCount);
+            create_property_on_element(newElement);
             elements.push_back(newElement);
         }
     }
