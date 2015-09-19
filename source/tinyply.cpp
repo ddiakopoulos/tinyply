@@ -26,10 +26,10 @@ void PlyProperty::parse_internal(std::istream & is)
     {
         string countType;
         is >> countType >> type;
-        listType = get_data_type(countType);
+        listType = property_type_from_string(countType);
         isList = true;
     }
-    propertyType = get_data_type(type);
+    propertyType = property_type_from_string(type);
     is >> name;
 }
 

@@ -112,7 +112,7 @@ static std::map<PlyProperty::Type, PropertyInfo> PropertyTable
     {PlyProperty::Type::INVALID,    {0, "INVALID"}}
 };
     
-inline PlyProperty::Type get_data_type(const std::string & t)
+inline PlyProperty::Type property_type_from_string(const std::string & t)
 {
     if      (t == "int8"    || t == "char")     return PlyProperty::Type::INT8;
     else if (t == "uint8"   || t == "uchar")    return PlyProperty::Type::UINT8;
@@ -139,7 +139,6 @@ inline PlyProperty::Type property_type_for_type(std::vector<T> & theType)
     else return PlyProperty::Type::INVALID;
 }
 
-    
 inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, const uint8_t * src, uint32_t & srcOffset)
 {
     switch (t)
