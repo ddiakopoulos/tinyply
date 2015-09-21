@@ -267,12 +267,21 @@ public:
             }
         }
         else throw std::invalid_argument("requested unknown element: " + elementKey);
-
+        
+        // count and verify large enougnh
         auto instance_counter = [&](const std::string & prop)
         {
             for (auto e : get_elements())
                 for (auto p : e.properties)
-                    if (p.name == prop) return e.size;
+                {
+                    if (p.name == prop)
+                    {
+                        if (PropertyTable[property_type_for_type(source)].stride != PropertyTable[p.propertyType].stride)
+                            throw std::runtime_error("destination vector is wrongly typed for this property");
+                        return e.size;
+                        
+                    }
+                }
             return 0;
         };
         
