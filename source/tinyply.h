@@ -127,17 +127,28 @@ inline PlyProperty::Type property_type_from_string(const std::string & t)
     return PlyProperty::Type::INVALID;
 }
 
-inline void resize_vector(const PlyProperty::Type t, void * vector, int32_t newSize, int32_t elementSize)
+template<typename T>
+inline uint8_t * resize_fix(void * v, int32_t newSize)
 {
-	auto what = static_cast<std::vector<int32_t> *>(vector);
-	std::cout << "OLD size! " << what->size() << std::endl;
+    auto vec = static_cast<std::vector<T> *>(v);
+    vec->resize(newSize);
+    return reinterpret_cast<uint8_t *>(vec->data());
+}
+    
+inline void resize_vector(const PlyProperty::Type t, void * v, int32_t newSize, uint8_t * & newPtr)
+{
     switch (t)
     {
-		case PlyProperty::Type::INT32:      what->resize(newSize); break;
+        case PlyProperty::Type::INT8:       newPtr = resize_fix<int8_t>(v, newSize); break;
+        case PlyProperty::Type::UINT8:      newPtr = resize_fix<uint8_t>(v, newSize); break;
+        case PlyProperty::Type::INT16:      newPtr = resize_fix<int16_t>(v, newSize); break;
+        case PlyProperty::Type::UINT16:     newPtr = resize_fix<uint16_t>(v, newSize); break;
+        case PlyProperty::Type::INT32:      newPtr = resize_fix<int32_t>(v, newSize); break;
+        case PlyProperty::Type::UINT32:     newPtr = resize_fix<uint32_t>(v, newSize); break;
+        case PlyProperty::Type::FLOAT32:    newPtr = resize_fix<float>(v, newSize); break;
+        case PlyProperty::Type::FLOAT64:    newPtr = resize_fix<double>(v, newSize); break;;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
-	std::cout << "new size! " << what->size() << std::endl;
-
 }
 
 template <typename T>
@@ -269,12 +280,10 @@ public:
     std::vector<std::string> objInfo;
     
     template<typename T>
-    int request_properties_from_element(std::string elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source, uint32_t listCount = 1)
+    int request_properties_from_element(std::string elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source)
     {
         if (get_elements().size() == 0)
             return 0;
-        
-		//if (elementKey == "tristrips") throw std::runtime_error("tristrips are not supported");
 
         if (find_element(elementKey, get_elements()) >= 0)
         {
@@ -304,6 +313,7 @@ public:
         
         // Properties in the userDataTable share the same cursor
         auto cursor = std::make_shared<DataCursor>();
+
         std::vector<uint32_t> instanceCounts;
                    
         for (auto key : propertyKeys)
@@ -321,10 +331,10 @@ public:
         uint32_t totalInstanceSize = [&]() { uint32_t t = 0; for (auto c : instanceCounts) { t += c; } return t; }();
         if ((totalInstanceSize / propertyKeys.size()) == instanceCounts[0])
         {
-            source.resize(totalInstanceSize * listCount);
-            cursor->data = reinterpret_cast<uint8_t*>(source.data());
-			cursor->vector = &source;
+            source.resize(totalInstanceSize); // elements like the Levoy tristrip break this convention
             cursor->offset = 0;
+            cursor->vector = &source;
+            cursor->data = reinterpret_cast<uint8_t *>(source.data());
         }
         else
         {
@@ -338,8 +348,9 @@ public:
     void add_properties_to_element(std::string elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source, int listCount = 1, PlyProperty::Type listType = PlyProperty::Type::INVALID)
     {
         auto cursor = std::make_shared<DataCursor>();
-        cursor->data = reinterpret_cast<uint8_t *>(source.data());
         cursor->offset = 0;
+        cursor->vector = &source;
+        cursor->data = reinterpret_cast<uint8_t *>(source.data());
         
         auto create_property_on_element = [&](PlyElement & e)
         {

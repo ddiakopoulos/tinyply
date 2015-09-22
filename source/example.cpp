@@ -86,7 +86,7 @@ void read_ply_file(const std::string & filename)
 
         std::vector<float> verts;
         std::vector<float> normals;
-        std::vector<int32_t> faces;
+        std::vector<uint32_t> faces;
 
         for (auto e : file.get_elements())
         {
@@ -99,8 +99,8 @@ void read_ply_file(const std::string & filename)
         std::cout << std::endl;
 
         uint32_t vertexCount = file.request_properties_from_element("vertex", {"x", "y", "z"}, verts);
-        //uint32_t normalCount = file.request_properties_from_element("vertex", {"nx", "ny", "nz"}, normals);
-        uint32_t faceCount = file.request_properties_from_element("tristrips", {"vertex_indices"}, faces, 1);
+        uint32_t normalCount = file.request_properties_from_element("vertex", {"nx", "ny", "nz"}, normals);
+        uint32_t faceCount = file.request_properties_from_element("face", {"vertex_indices"}, faces);
 
         timepoint before = now();
         file.parse(ss, f);
@@ -120,6 +120,6 @@ void read_ply_file(const std::string & filename)
 int main(int argc, char *argv[])
 {
     write_ply_example("example.ply");
-    read_ply_file("assets/elephant.ply");
+    read_ply_file("example.ply");
     return 0;
 }

@@ -236,15 +236,19 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
             {
                 for (const auto & property : element.properties)
                 {
-                    if (userDataTable[property.name])
+                    bool resizedElement = false;
+                    if (auto & cursor = userDataTable[property.name])
                     {
-                        auto & cursor = userDataTable[property.name];
                         if (property.isList)
                         {
                             int32_t listSize = 0;
                             uint32_t dummyCount = 0;
                             read_property(property.listType, &listSize, dummyCount, srcBuffer, fileOffset);
-							resize_vector(property.propertyType, cursor->vector, listSize, element.size);
+                            if (resizedElement == false)
+                            {
+                                resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
+                                resizedElement = true;
+                            }
                             for (auto i = 0; i < listSize; ++i)
 								 read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
                         }
@@ -274,14 +278,19 @@ void PlyFile::parse_data_ascii(std::istream & is, const std::vector<uint8_t> & b
             {
                 for (const auto & property : element.properties)
                 {
-                    if (userDataTable[property.name])
+                    bool resizedElement = false;
+                    if (auto & cursor = userDataTable[property.name])
                     {
-                        auto & cursor = userDataTable[property.name];
                         if (property.isList)
                         {
                             int32_t listSize = 0;
                             uint32_t dummyCount = 0;
                             read_property(property.listType, &listSize, dummyCount, is);
+                            if (resizedElement == false)
+                            {
+                                resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
+                                resizedElement = true;
+                            }
                             for (auto i = 0; i < listSize; ++i)
                             {
                                 read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
