@@ -47,6 +47,7 @@ static inline uint64_t swap_64(uint64_t value)
 
 struct DataCursor
 {
+	void * vector;
     uint8_t * data;
     uint32_t offset;
 };
@@ -124,6 +125,19 @@ inline PlyProperty::Type property_type_from_string(const std::string & t)
     else if (t == "float32" || t == "float")    return PlyProperty::Type::FLOAT32;
     else if (t == "float64" || t == "double")   return PlyProperty::Type::FLOAT64;
     return PlyProperty::Type::INVALID;
+}
+
+inline void resize_vector(const PlyProperty::Type t, void * vector, int32_t newSize, int32_t elementSize)
+{
+	auto what = static_cast<std::vector<int32_t> *>(vector);
+	std::cout << "OLD size! " << what->size() << std::endl;
+    switch (t)
+    {
+		case PlyProperty::Type::INT32:      what->resize(newSize); break;
+        case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
+    }
+	std::cout << "new size! " << what->size() << std::endl;
+
 }
 
 template <typename T>
@@ -309,6 +323,7 @@ public:
         {
             source.resize(totalInstanceSize * listCount);
             cursor->data = reinterpret_cast<uint8_t*>(source.data());
+			cursor->vector = &source;
             cursor->offset = 0;
         }
         else

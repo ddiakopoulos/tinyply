@@ -244,8 +244,9 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
                             int32_t listSize = 0;
                             uint32_t dummyCount = 0;
                             read_property(property.listType, &listSize, dummyCount, srcBuffer, fileOffset);
+							resize_vector(property.propertyType, cursor->vector, listSize, element.size);
                             for (auto i = 0; i < listSize; ++i)
-                                read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
+								 read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
                         }
                         else
                         {
