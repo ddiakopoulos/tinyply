@@ -58,7 +58,7 @@ void write_ply_example(const std::string & filename)
     
     // Octohedron with junk normals
     verts = { 1.0,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,-1.0,0.0,0.0,0.0,1.0,0.0,0.0,-1.0 };
-    norms = { -0.0001,0.25,0.25,-2.25,2.25,0.25,0.25,1.25,0.25,0.25,-2.55,0.25,0.33,0.25,1.11,0.25675,0.25,-1.0 };
+    norms = { -0.0001f,0.25f,0.25f,-2.25f,2.25f,0.25f,0.25f,1.25f,0.25f,0.25f,-2.55f,0.25f,0.33f,0.25f,1.11f,0.25675f,0.25f,-1.0f };
     faces = { 0, 2, 4, 0, 4, 3, 0, 3, 5, 0, 5, 2, 1, 2, 5, 1, 5, 3, 1, 3, 4, 1, 2, 4 };
     
     std::ofstream outputFile(filename);
@@ -86,7 +86,7 @@ void read_ply_file(const std::string & filename)
 
         std::vector<float> verts;
         std::vector<float> normals;
-        std::vector<uint32_t> faces;
+        std::vector<int32_t> faces;
 
         for (auto e : file.get_elements())
         {
@@ -99,8 +99,8 @@ void read_ply_file(const std::string & filename)
         std::cout << std::endl;
 
         uint32_t vertexCount = file.request_properties_from_element("vertex", {"x", "y", "z"}, verts);
-        uint32_t normalCount = file.request_properties_from_element("vertex", {"nx", "ny", "nz"}, normals);
-        uint32_t faceCount = file.request_properties_from_element("face", {"vertex_indices"}, faces, 3);
+        //uint32_t normalCount = file.request_properties_from_element("vertex", {"nx", "ny", "nz"}, normals);
+        uint32_t faceCount = file.request_properties_from_element("tristrips", {"vertex_indices"}, faces, 39290);
 
         timepoint before = now();
         file.parse(ss, f);
@@ -120,6 +120,6 @@ void read_ply_file(const std::string & filename)
 int main(int argc, char *argv[])
 {
     write_ply_example("example.ply");
-    read_ply_file("example.ply");
+    read_ply_file("assets/elephant.ply");
     return 0;
 }

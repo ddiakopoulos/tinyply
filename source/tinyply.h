@@ -15,6 +15,7 @@
 #include <iostream>
 #include <sstream>
 #include <type_traits>
+#include <memory>
 
 namespace tinyply
 {
@@ -145,7 +146,7 @@ inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffse
     {
         case PlyProperty::Type::INT8:       ply_cast<int8_t>(dest, src + srcOffset);    break;
         case PlyProperty::Type::UINT8:      ply_cast<uint8_t>(dest, src + srcOffset);   break;
-        case PlyProperty::Type::INT16:      ply_cast<uint8_t>(dest, src+ srcOffset);    break;
+        case PlyProperty::Type::INT16:      ply_cast<int16_t>(dest, src+ srcOffset);    break;
         case PlyProperty::Type::UINT16:     ply_cast<uint16_t>(dest, src + srcOffset);  break;
         case PlyProperty::Type::INT32:      ply_cast<int32_t>(dest, src + srcOffset);   break;
         case PlyProperty::Type::UINT32:     ply_cast<uint32_t>(dest, src + srcOffset);  break;
@@ -205,7 +206,7 @@ inline void skip_property(uint32_t & fileOffset, const PlyProperty & property, c
         uint32_t listSize = 0;
         uint32_t dummyCount = 0;
         read_property(property.listType, &listSize, dummyCount, src, fileOffset);
-        for (int i = 0; i < listSize; ++i) fileOffset += PropertyTable[property.propertyType].stride;
+        for (uint32_t i = 0; i < listSize; ++i) fileOffset += PropertyTable[property.propertyType].stride;
     }
     fileOffset += PropertyTable[property.propertyType].stride;
 }
@@ -259,6 +260,8 @@ public:
         if (get_elements().size() == 0)
             return 0;
         
+		if (elementKey == "tristrips") throw std::runtime_error("tristrips are not supported");
+
         if (find_element(elementKey, get_elements()) >= 0)
         {
             if (std::find(requestedElements.begin(), requestedElements.end(), elementKey) == requestedElements.end())

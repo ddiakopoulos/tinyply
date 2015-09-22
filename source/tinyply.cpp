@@ -226,7 +226,7 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
 {
     uint32_t fileOffset = 0;
     const size_t headerPosition = is.tellg();
-    const std::uint8_t * srcBuffer = buffer.data() + headerPosition;
+    const uint8_t * srcBuffer = buffer.data() + headerPosition;
     
     for (auto & element : get_elements())
     {
@@ -241,10 +241,10 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
                         auto & cursor = userDataTable[property.name];
                         if (property.isList)
                         {
-                            uint32_t listSize = 0;
+                            int32_t listSize = 0;
                             uint32_t dummyCount = 0;
                             read_property(property.listType, &listSize, dummyCount, srcBuffer, fileOffset);
-                            for (int i = 0; i < listSize; ++i)
+                            for (auto i = 0; i < listSize; ++i)
                                 read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
                         }
                         else
@@ -278,10 +278,10 @@ void PlyFile::parse_data_ascii(std::istream & is, const std::vector<uint8_t> & b
                         auto & cursor = userDataTable[property.name];
                         if (property.isList)
                         {
-                            uint32_t listSize = 0;
+                            int32_t listSize = 0;
                             uint32_t dummyCount = 0;
                             read_property(property.listType, &listSize, dummyCount, is);
-                            for (int i = 0; i < listSize; ++i)
+                            for (auto i = 0; i < listSize; ++i)
                             {
                                 read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
                             }
