@@ -100,7 +100,7 @@ void read_ply_file(const std::string & filename)
 
         uint32_t vertexCount = file.request_properties_from_element("vertex", {"x", "y", "z"}, verts);
         //uint32_t normalCount = file.request_properties_from_element("vertex", {"nx", "ny", "nz"}, normals);
-        uint32_t faceCount = file.request_properties_from_element("tristrips", {"vertex_indices"}, faces, 39290);
+        uint32_t faceCount = file.request_properties_from_element("tristrips", {"vertex_indices"}, faces, 1);
 
         timepoint before = now();
         file.parse(ss, f);

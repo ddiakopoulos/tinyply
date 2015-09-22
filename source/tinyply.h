@@ -260,7 +260,7 @@ public:
         if (get_elements().size() == 0)
             return 0;
         
-		if (elementKey == "tristrips") throw std::runtime_error("tristrips are not supported");
+		//if (elementKey == "tristrips") throw std::runtime_error("tristrips are not supported");
 
         if (find_element(elementKey, get_elements()) >= 0)
         {
@@ -271,7 +271,7 @@ public:
         }
         else throw std::invalid_argument("requested unknown element: " + elementKey);
         
-        // count and verify large enougnh
+        // count and verify large enough
         auto instance_counter = [&](const std::string & prop)
         {
             for (auto e : get_elements())
@@ -280,7 +280,7 @@ public:
                     if (p.name == prop)
                     {
                         if (PropertyTable[property_type_for_type(source)].stride != PropertyTable[p.propertyType].stride)
-                            throw std::runtime_error("destination vector is wrongly typed for this property");
+                            throw std::runtime_error("destination vector is wrongly typed to hold this property");
                         return e.size;
                         
                     }
@@ -288,7 +288,7 @@ public:
             return 0;
         };
         
-        // Properties in the requestTable share the same cursor
+        // Properties in the userDataTable share the same cursor
         auto cursor = std::make_shared<DataCursor>();
         std::vector<uint32_t> instanceCounts;
                    
