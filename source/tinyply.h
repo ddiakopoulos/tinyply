@@ -76,7 +76,7 @@ public:
     
     Type listType, propertyType;
     bool isList;
-    int listCount;
+    int listCount = 0;
     std::string name;
 };
 
@@ -233,7 +233,10 @@ inline void skip_property(uint32_t & fileOffset, const PlyProperty & property, c
         read_property(property.listType, &listSize, dummyCount, src, fileOffset);
         for (uint32_t i = 0; i < listSize; ++i) fileOffset += PropertyTable[property.propertyType].stride;
     }
-    fileOffset += PropertyTable[property.propertyType].stride;
+	else
+	{
+		fileOffset += PropertyTable[property.propertyType].stride;
+	}
 }
     
 inline void skip_property(std::istream & is, const PlyProperty & property)

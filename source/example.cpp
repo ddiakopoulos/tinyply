@@ -99,7 +99,7 @@ void read_ply_file(const std::string & filename)
         std::cout << std::endl;
 
         uint32_t vertexCount = file.request_properties_from_element("vertex", {"x", "y", "z"}, verts);
-        uint32_t normalCount = file.request_properties_from_element("vertex", {"nx", "ny", "nz"}, normals);
+        //uint32_t normalCount = file.request_properties_from_element("vertex", {"nx", "ny", "nz"}, normals);
         uint32_t faceCount = file.request_properties_from_element("face", {"vertex_indices"}, faces);
 
         timepoint before = now();
@@ -119,7 +119,7 @@ void read_ply_file(const std::string & filename)
 
 int main(int argc, char *argv[])
 {
-    write_ply_example("example.ply");
-    read_ply_file("example.ply");
+    //write_ply_example("example.ply");
+    read_ply_file("assets/sofa.ply");
     return 0;
 }

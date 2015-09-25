@@ -230,27 +230,30 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
     
     for (auto & element : get_elements())
     {
+		bool resizedElement = false;
         if (std::find(requestedElements.begin(), requestedElements.end(), element.name) != requestedElements.end())
         {
             for (int64_t count = 0; count < element.size; ++count)
             {
-                for (const auto & property : element.properties)
+                for (auto & property : element.properties)
                 {
-                    bool resizedElement = false;
                     if (auto & cursor = userDataTable[property.name])
                     {
                         if (property.isList)
                         {
-                            int32_t listSize = 0;
+                            uint32_t listSize = 0;
                             uint32_t dummyCount = 0;
                             read_property(property.listType, &listSize, dummyCount, srcBuffer, fileOffset);
-                            if (resizedElement == false)
-                            {
-                                resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
-                                resizedElement = true;
-                            }
-                            for (auto i = 0; i < listSize; ++i)
-								 read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
+							property.listCount += listSize;
+							if (resizedElement == false)
+							{
+								// first time we encounter a list, resize destination vector assuming that the remaining lists are the same size
+								resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
+								resizedElement = true;
+							}
+							for (auto i = 0; i < listSize; ++i)
+									read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
+
                         }
                         else
                         {
@@ -272,13 +275,13 @@ void PlyFile::parse_data_ascii(std::istream & is, const std::vector<uint8_t> & b
 {
     for (auto & element : get_elements())
     {
+		bool resizedElement = false;
         if (std::find(requestedElements.begin(), requestedElements.end(), element.name) != requestedElements.end())
         {
             for (int64_t count = 0; count < element.size; ++count)
             {
-                for (const auto & property : element.properties)
+                for (auto & property : element.properties)
                 {
-                    bool resizedElement = false;
                     if (auto & cursor = userDataTable[property.name])
                     {
                         if (property.isList)
@@ -286,6 +289,7 @@ void PlyFile::parse_data_ascii(std::istream & is, const std::vector<uint8_t> & b
                             int32_t listSize = 0;
                             uint32_t dummyCount = 0;
                             read_property(property.listType, &listSize, dummyCount, is);
+							property.listCount += listSize;
                             if (resizedElement == false)
                             {
                                 resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
