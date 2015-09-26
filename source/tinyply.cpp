@@ -228,9 +228,38 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
     const size_t headerPosition = is.tellg();
     const uint8_t * srcBuffer = buffer.data() + headerPosition;
     
+	auto find_property_list_size = [&]()
+	{
+		uint32_t localOffset = 0;
+		for (auto & element : get_elements())
+		{
+			for (int64_t count = 0; count < element.size; ++count)
+			{
+				bool foundPropetyListSize = false;
+				for (const auto & property : element.properties)
+				{
+					if (const auto & cursor = userDataTable[property.name])
+					{
+						int expectedListMultiplier = skip_property(localOffset, property, srcBuffer);
+						if (expectedListMultiplier)
+						{
+							foundPropetyListSize = true;
+							resize_vector(property.propertyType, cursor->vector, expectedListMultiplier * element.size, cursor->data);
+							std::cout << "Resized: " << property.name << " to " << element.size << std::endl;
+							std::cout << expectedListMultiplier << std::endl;
+						}
+					}
+				}
+				if (foundPropetyListSize)
+					break;
+			}
+		}
+	};
+
+	find_property_list_size();
+
     for (auto & element : get_elements())
     {
-		bool resizedElement = false;
         if (std::find(requestedElements.begin(), requestedElements.end(), element.name) != requestedElements.end())
         {
             for (int64_t count = 0; count < element.size; ++count)
@@ -244,15 +273,9 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
                             uint32_t listSize = 0;
                             uint32_t dummyCount = 0;
                             read_property(property.listType, &listSize, dummyCount, srcBuffer, fileOffset);
-							property.listCount += listSize;
-							if (resizedElement == false)
-							{
-								// first time we encounter a list, resize destination vector assuming that the remaining lists are the same size
-								resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
-								resizedElement = true;
-							}
+
 							for (auto i = 0; i < listSize; ++i)
-									read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
+								read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
 
                         }
                         else

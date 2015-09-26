@@ -224,7 +224,7 @@ inline void write_property_binary(PlyProperty::Type t, std::ostringstream & os, 
     srcOffset += PropertyTable[t].stride;
 }
 
-inline void skip_property(uint32_t & fileOffset, const PlyProperty & property, const uint8_t * src)
+inline uint32_t skip_property(uint32_t & fileOffset, const PlyProperty & property, const uint8_t * src)
 {
     if (property.isList)
     {
@@ -232,10 +232,12 @@ inline void skip_property(uint32_t & fileOffset, const PlyProperty & property, c
         uint32_t dummyCount = 0;
         read_property(property.listType, &listSize, dummyCount, src, fileOffset);
         for (uint32_t i = 0; i < listSize; ++i) fileOffset += PropertyTable[property.propertyType].stride;
+		return listSize;
     }
 	else
 	{
 		fileOffset += PropertyTable[property.propertyType].stride;
+		return 0;
 	}
 }
     
