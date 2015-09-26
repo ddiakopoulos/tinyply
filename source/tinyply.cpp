@@ -139,7 +139,7 @@ void PlyFile::write_binary_internal(std::ostringstream & os)
         {
             for (auto & p : e.properties)
             {
-                auto & cursor = userDataTable[p.name];
+                auto & cursor = userDataTable[make_key(e.name, p.name)];
                 if (p.isList)
                 {
                     uint8_t listSize[4] = {0, 0, 0, 0};
@@ -170,7 +170,7 @@ void PlyFile::write_ascii_internal(std::ostringstream & os)
         {
             for (auto & p : e.properties)
             {
-                auto & cursor = userDataTable[p.name];
+                auto & cursor = userDataTable[make_key(e.name, p.name)];
                 if (p.isList)
                 {
                     os << p.listCount << " ";
@@ -238,7 +238,7 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
 				bool foundPropetyListSize = false;
 				for (const auto & property : element.properties)
 				{
-					if (const auto & cursor = userDataTable[property.name])
+					if (const auto & cursor = userDataTable[make_key(element.name, property.name)])
 					{
 						int expectedListMultiplier = skip_property(localOffset, property, srcBuffer);
 						if (expectedListMultiplier)
@@ -253,8 +253,8 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
 				if (foundPropetyListSize)
 					break;
 			}
-		}
-	};
+
+		}	};
 
 	find_property_list_size();
 
@@ -266,7 +266,7 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
             {
                 for (auto & property : element.properties)
                 {
-                    if (auto & cursor = userDataTable[property.name])
+                    if (auto & cursor = userDataTable[make_key(element.name, property.name)])
                     {
                         if (property.isList)
                         {
@@ -305,7 +305,7 @@ void PlyFile::parse_data_ascii(std::istream & is, const std::vector<uint8_t> & b
             {
                 for (auto & property : element.properties)
                 {
-                    if (auto & cursor = userDataTable[property.name])
+                    if (auto & cursor = userDataTable[make_key(element.name, property.name)])
                     {
                         if (property.isList)
                         {

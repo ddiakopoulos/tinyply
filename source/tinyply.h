@@ -19,7 +19,7 @@
 
 namespace tinyply
 {
-
+    
 static inline uint16_t swap_16(uint16_t value)
 {
     return (uint16_t)((value >> 8) | (value << 8));
@@ -79,6 +79,11 @@ public:
     int listCount = 0;
     std::string name;
 };
+    
+inline std::string make_key(const std::string & a, const std::string & b)
+{
+    return (a + "-" + b);
+}
 
 template<typename T>
 void ply_cast(void * dest, const uint8_t * src)
@@ -326,7 +331,7 @@ public:
             if (int instanceCount = instance_counter(key))
             {
                 instanceCounts.push_back(instanceCount);
-                auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(key, cursor));
+                auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(make_key(elementKey, key), cursor));
                 if (result.second == false)
                     throw std::runtime_error("property has already been requested: " + key);
             }
@@ -363,7 +368,7 @@ public:
             {
                 PlyProperty::Type t = property_type_for_type(source);
                 PlyProperty newProp = (listType == PlyProperty::Type::INVALID) ? PlyProperty(t, key) : PlyProperty(listType, t, key, listCount);
-                userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(key, cursor));
+                userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(make_key(e.name, key), cursor));
                 e.properties.push_back(newProp);
             }
         };
