@@ -199,13 +199,13 @@ inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffse
     }
     destOffset += PropertyTable[t].stride;
 }
-    
+
 inline void write_property_ascii(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
 {
     switch (t)
     {
-        case PlyProperty::Type::INT8:       os << *reinterpret_cast<int8_t*>(src);      break;
-        case PlyProperty::Type::UINT8:      os << *reinterpret_cast<uint8_t*>(src);     break;
+        case PlyProperty::Type::INT8:       os << static_cast<int32_t>(*reinterpret_cast<int8_t*>(src));    break;
+        case PlyProperty::Type::UINT8:      os << static_cast<uint32_t>(*reinterpret_cast<uint8_t*>(src));  break;
         case PlyProperty::Type::INT16:      os << *reinterpret_cast<int16_t*>(src);     break;
         case PlyProperty::Type::UINT16:     os << *reinterpret_cast<uint16_t*>(src);    break;
         case PlyProperty::Type::INT32:      os << *reinterpret_cast<int32_t*>(src);     break;
