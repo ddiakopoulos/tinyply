@@ -59,11 +59,6 @@ PlyFile::PlyFile(std::istream & is)
     }
 }
 
-PlyFile::~PlyFile()
-{
-    
-}
-
 bool PlyFile::parse_header(std::istream& is)
 {
     std::string line;
@@ -116,10 +111,10 @@ void PlyFile::read_header_property(std::istream & is)
     get_elements().back().properties.push_back(e);
 }
 
-void PlyFile::parse(std::istream & is, const std::vector<uint8_t> & buffer)
+void PlyFile::read(std::istream & is, const std::vector<uint8_t> & buffer)
 {
-    if (isBinary) parse_data_binary(is, buffer);
-    else parse_data_ascii(is, buffer);
+    if (isBinary) read_binary_internal(is, buffer);
+    else read_ascii_internal(is, buffer);
 }
 
 void PlyFile::write(std::ostringstream & os, bool isBinary)
@@ -222,41 +217,11 @@ void PlyFile::write_header(std::ostringstream & os)
     os << "end_header" << std::endl;
 }
 
-void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & buffer)
+void PlyFile::read_binary_internal(std::istream & is, const std::vector<uint8_t> & buffer)
 {
     uint32_t fileOffset = 0;
     const size_t headerPosition = is.tellg();
     const uint8_t * srcBuffer = buffer.data() + headerPosition;
-    
-	auto find_property_list_size = [&]()
-	{
-		uint32_t localOffset = 0;
-		for (auto & element : get_elements())
-		{
-			for (int64_t count = 0; count < element.size; ++count)
-			{
-				bool foundPropetyListSize = false;
-				for (const auto & property : element.properties)
-				{
-					if (const auto & cursor = userDataTable[make_key(element.name, property.name)])
-					{
-						int expectedListMultiplier = skip_property(localOffset, property, srcBuffer);
-						if (expectedListMultiplier)
-						{
-							foundPropetyListSize = true;
-							resize_vector(property.propertyType, cursor->vector, expectedListMultiplier * element.size, cursor->data);
-							std::cout << "Resized: " << property.name << " to " << element.size << std::endl;
-							std::cout << expectedListMultiplier << std::endl;
-						}
-					}
-				}
-				if (foundPropetyListSize)
-					break;
-			}
-
-		}	};
-
-	find_property_list_size();
 
     for (auto & element : get_elements())
     {
@@ -273,10 +238,13 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
                             uint32_t listSize = 0;
                             uint32_t dummyCount = 0;
                             read_property(property.listType, &listSize, dummyCount, srcBuffer, fileOffset);
-
+                            if (cursor->realloc == false)
+                            {
+                                cursor->realloc = true;
+                                resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
+                            }
 							for (auto i = 0; i < listSize; ++i)
 								read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
-
                         }
                         else
                         {
@@ -294,11 +262,10 @@ void PlyFile::parse_data_binary(std::istream & is, const std::vector<uint8_t> & 
     }
 }
 
-void PlyFile::parse_data_ascii(std::istream & is, const std::vector<uint8_t> & buffer)
+void PlyFile::read_ascii_internal(std::istream & is, const std::vector<uint8_t> & buffer)
 {
     for (auto & element : get_elements())
     {
-		bool resizedElement = false;
         if (std::find(requestedElements.begin(), requestedElements.end(), element.name) != requestedElements.end())
         {
             for (int64_t count = 0; count < element.size; ++count)
@@ -312,11 +279,10 @@ void PlyFile::parse_data_ascii(std::istream & is, const std::vector<uint8_t> & b
                             int32_t listSize = 0;
                             uint32_t dummyCount = 0;
                             read_property(property.listType, &listSize, dummyCount, is);
-							property.listCount += listSize;
-                            if (resizedElement == false)
+                            if (cursor->realloc == false)
                             {
+                                cursor->realloc = true;
                                 resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
-                                resizedElement = true;
                             }
                             for (auto i = 0; i < listSize; ++i)
                             {

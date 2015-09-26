@@ -50,6 +50,7 @@ struct DataCursor
 	void * vector;
     uint8_t * data;
     uint32_t offset;
+    bool realloc = false;
 };
 
 class PlyProperty
@@ -281,10 +282,11 @@ class PlyFile
 public:
     PlyFile() {}
     PlyFile(std::istream & is);
-    ~PlyFile();
 
-    void parse(std::istream & is, const std::vector<uint8_t> & buffer);
+    void read(std::istream & is, const std::vector<uint8_t> & buffer);
     void write(std::ostringstream & os, bool isBinary);
+    
+    std::vector<PlyElement> & get_elements() { return elements; }
     
     std::vector<std::string> comments;
     std::vector<std::string> objInfo;
@@ -298,9 +300,7 @@ public:
         if (find_element(elementKey, get_elements()) >= 0)
         {
             if (std::find(requestedElements.begin(), requestedElements.end(), elementKey) == requestedElements.end())
-            {
                 requestedElements.push_back(elementKey);
-            }
         }
         else throw std::invalid_argument("requested unknown element: " + elementKey);
         
@@ -332,8 +332,7 @@ public:
             {
                 instanceCounts.push_back(instanceCount);
                 auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(make_key(elementKey, key), cursor));
-                if (result.second == false)
-                    throw std::runtime_error("property has already been requested: " + key);
+                if (result.second == false) throw std::runtime_error("property has already been requested: " + key);
             }
             else throw std::invalid_argument("requested unknown property: " + key);
         }
@@ -346,10 +345,7 @@ public:
             cursor->vector = &source;
             cursor->data = reinterpret_cast<uint8_t *>(source.data());
         }
-        else
-        {
-            throw std::runtime_error("count mismatch for requested properties");
-        }
+        else throw std::runtime_error("count mismatch for requested properties");
 
         return totalInstanceSize;
     }
@@ -387,8 +383,6 @@ public:
         }
     }
     
-    std::vector<PlyElement> & get_elements() { return elements; }
-    
 private:
         
     bool parse_header(std::istream & is);
@@ -399,8 +393,8 @@ private:
     void read_header_property(std::istream & is);
     void read_header_text(std::string line, std::istream & is, std::vector<std::string> place, int erase = 0);
     
-    void parse_data_binary(std::istream & is, const std::vector<uint8_t> & buffer);
-    void parse_data_ascii(std::istream & is, const std::vector<uint8_t> & buffer);
+    void read_ascii_internal(std::istream & is, const std::vector<uint8_t> & buffer);
+    void read_binary_internal(std::istream & is, const std::vector<uint8_t> & buffer);
     
     void write_ascii_internal(std::ostringstream & os);
     void write_binary_internal(std::ostringstream & os);
