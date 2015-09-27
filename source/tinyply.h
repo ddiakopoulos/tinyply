@@ -20,31 +20,6 @@
 namespace tinyply
 {
     
-static inline uint16_t swap_16(uint16_t value)
-{
-    return (uint16_t)((value >> 8) | (value << 8));
-}
-
-static inline uint32_t swap_32(uint32_t value)
-{
-    return (((value & 0x000000ff) << 24) |
-            ((value & 0x0000ff00) <<  8) |
-            ((value & 0x00ff0000) >>  8) |
-            ((value & 0xff000000) >> 24));
-}
-
-static inline uint64_t swap_64(uint64_t value)
-{
-    return (((value & 0x00000000000000ffLL) << 56) |
-            ((value & 0x000000000000ff00LL) << 40) |
-            ((value & 0x0000000000ff0000LL) << 24) |
-            ((value & 0x00000000ff000000LL) << 8)  |
-            ((value & 0x000000ff00000000LL) >> 8)  |
-            ((value & 0x0000ff0000000000LL) >> 24) |
-            ((value & 0x00ff000000000000LL) >> 40) |
-            ((value & 0xff00000000000000LL) >> 56));
-}
-
 struct DataCursor
 {
 	void * vector;
@@ -85,7 +60,7 @@ inline std::string make_key(const std::string & a, const std::string & b)
 {
     return (a + "-" + b);
 }
-
+    
 template<typename T>
 void ply_cast(void * dest, const uint8_t * src)
 {
@@ -134,25 +109,25 @@ inline PlyProperty::Type property_type_from_string(const std::string & t)
 }
 
 template<typename T>
-inline uint8_t * resize_fix(void * v, int32_t newSize)
+inline uint8_t * resize(void * v, int32_t newSize)
 {
     auto vec = static_cast<std::vector<T> *>(v);
     vec->resize(newSize);
     return reinterpret_cast<uint8_t *>(vec->data());
 }
     
-inline void resize_vector(const PlyProperty::Type t, void * v, int32_t newSize, uint8_t * & newPtr)
+inline void resize_vector(const PlyProperty::Type t, void * v, int32_t newSize, uint8_t *& ptr)
 {
     switch (t)
     {
-        case PlyProperty::Type::INT8:       newPtr = resize_fix<int8_t>(v, newSize); break;
-        case PlyProperty::Type::UINT8:      newPtr = resize_fix<uint8_t>(v, newSize); break;
-        case PlyProperty::Type::INT16:      newPtr = resize_fix<int16_t>(v, newSize); break;
-        case PlyProperty::Type::UINT16:     newPtr = resize_fix<uint16_t>(v, newSize); break;
-        case PlyProperty::Type::INT32:      newPtr = resize_fix<int32_t>(v, newSize); break;
-        case PlyProperty::Type::UINT32:     newPtr = resize_fix<uint32_t>(v, newSize); break;
-        case PlyProperty::Type::FLOAT32:    newPtr = resize_fix<float>(v, newSize); break;
-        case PlyProperty::Type::FLOAT64:    newPtr = resize_fix<double>(v, newSize); break;;
+        case PlyProperty::Type::INT8:       ptr = resize<int8_t>(v, newSize);   break;
+        case PlyProperty::Type::UINT8:      ptr = resize<uint8_t>(v, newSize);  break;
+        case PlyProperty::Type::INT16:      ptr = resize<int16_t>(v, newSize);  break;
+        case PlyProperty::Type::UINT16:     ptr = resize<uint16_t>(v, newSize); break;
+        case PlyProperty::Type::INT32:      ptr = resize<int32_t>(v, newSize);  break;
+        case PlyProperty::Type::UINT32:     ptr = resize<uint32_t>(v, newSize); break;
+        case PlyProperty::Type::FLOAT32:    ptr = resize<float>(v, newSize);    break;
+        case PlyProperty::Type::FLOAT64:    ptr = resize<double>(v, newSize);   break;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
 }
@@ -160,103 +135,15 @@ inline void resize_vector(const PlyProperty::Type t, void * v, int32_t newSize, 
 template <typename T>
 inline PlyProperty::Type property_type_for_type(std::vector<T> & theType)
 {
-    if (std::is_same<T, int8_t>::value)     return PlyProperty::Type::INT8;
-    if (std::is_same<T, uint8_t>::value)    return PlyProperty::Type::UINT8;
-    if (std::is_same<T, int16_t>::value)    return PlyProperty::Type::INT16;
-    if (std::is_same<T, uint16_t>::value)   return PlyProperty::Type::UINT16;
-    if (std::is_same<T, int32_t>::value)    return PlyProperty::Type::INT32;
-    if (std::is_same<T, uint32_t>::value)   return PlyProperty::Type::UINT32;
-    if (std::is_same<T, float>::value)      return PlyProperty::Type::FLOAT32;
-    if (std::is_same<T, double>::value)     return PlyProperty::Type::FLOAT64;
+    if      (std::is_same<T, int8_t>::value)     return PlyProperty::Type::INT8;
+    else if (std::is_same<T, uint8_t>::value)    return PlyProperty::Type::UINT8;
+    else if (std::is_same<T, int16_t>::value)    return PlyProperty::Type::INT16;
+    else if (std::is_same<T, uint16_t>::value)   return PlyProperty::Type::UINT16;
+    else if (std::is_same<T, int32_t>::value)    return PlyProperty::Type::INT32;
+    else if (std::is_same<T, uint32_t>::value)   return PlyProperty::Type::UINT32;
+    else if (std::is_same<T, float>::value)      return PlyProperty::Type::FLOAT32;
+    else if (std::is_same<T, double>::value)     return PlyProperty::Type::FLOAT64;
     else return PlyProperty::Type::INVALID;
-}
-
-inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, const uint8_t * src, uint32_t & srcOffset)
-{
-    switch (t)
-    {
-        case PlyProperty::Type::INT8:       ply_cast<int8_t>(dest, src + srcOffset);    break;
-        case PlyProperty::Type::UINT8:      ply_cast<uint8_t>(dest, src + srcOffset);   break;
-        case PlyProperty::Type::INT16:      ply_cast<int16_t>(dest, src+ srcOffset);    break;
-        case PlyProperty::Type::UINT16:     ply_cast<uint16_t>(dest, src + srcOffset);  break;
-        case PlyProperty::Type::INT32:      ply_cast<int32_t>(dest, src + srcOffset);   break;
-        case PlyProperty::Type::UINT32:     ply_cast<uint32_t>(dest, src + srcOffset);  break;
-        case PlyProperty::Type::FLOAT32:    ply_cast<float>(dest, src + srcOffset);     break;
-        case PlyProperty::Type::FLOAT64:    ply_cast<double>(dest, src + srcOffset);    break;
-        case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
-    }
-    destOffset += PropertyTable[t].stride;
-    srcOffset += PropertyTable[t].stride;
-}
-
-inline void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is)
-{
-    switch (t)
-    {
-        case PlyProperty::Type::INT8:       *((int8_t *)dest) = ply_read_ascii<int32_t>(is);        break;
-        case PlyProperty::Type::UINT8:      *((uint8_t *)dest) = ply_read_ascii<uint32_t>(is);      break;
-        case PlyProperty::Type::INT16:      ply_cast_ascii<int16_t>(dest, is);                      break;
-        case PlyProperty::Type::UINT16:     ply_cast_ascii<uint16_t>(dest, is);                     break;
-        case PlyProperty::Type::INT32:      ply_cast_ascii<int32_t>(dest, is);                      break;
-        case PlyProperty::Type::UINT32:     ply_cast_ascii<uint32_t>(dest, is);                     break;
-        case PlyProperty::Type::FLOAT32:    ply_cast_ascii<float>(dest, is);                        break;
-        case PlyProperty::Type::FLOAT64:    ply_cast_ascii<double>(dest, is);                       break;
-        case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
-    }
-    destOffset += PropertyTable[t].stride;
-}
-
-inline void write_property_ascii(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
-{
-    switch (t)
-    {
-        case PlyProperty::Type::INT8:       os << static_cast<int32_t>(*reinterpret_cast<int8_t*>(src));    break;
-        case PlyProperty::Type::UINT8:      os << static_cast<uint32_t>(*reinterpret_cast<uint8_t*>(src));  break;
-        case PlyProperty::Type::INT16:      os << *reinterpret_cast<int16_t*>(src);     break;
-        case PlyProperty::Type::UINT16:     os << *reinterpret_cast<uint16_t*>(src);    break;
-        case PlyProperty::Type::INT32:      os << *reinterpret_cast<int32_t*>(src);     break;
-        case PlyProperty::Type::UINT32:     os << *reinterpret_cast<uint32_t*>(src);    break;
-        case PlyProperty::Type::FLOAT32:    os << *reinterpret_cast<float*>(src);       break;
-        case PlyProperty::Type::FLOAT64:    os << *reinterpret_cast<double*>(src);      break;
-        case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
-    }
-    os << " ";
-    srcOffset += PropertyTable[t].stride;
-}
-    
-inline void write_property_binary(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
-{
-    os.write(reinterpret_cast<const char *>(src), PropertyTable[t].stride);
-    srcOffset += PropertyTable[t].stride;
-}
-
-inline uint32_t skip_property(uint32_t & fileOffset, const PlyProperty & property, const uint8_t * src)
-{
-    if (property.isList)
-    {
-        uint32_t listSize = 0;
-        uint32_t dummyCount = 0;
-        read_property(property.listType, &listSize, dummyCount, src, fileOffset);
-        for (uint32_t i = 0; i < listSize; ++i) fileOffset += PropertyTable[property.propertyType].stride;
-		return listSize;
-    }
-	else
-	{
-		fileOffset += PropertyTable[property.propertyType].stride;
-		return 0;
-	}
-}
-    
-inline void skip_property(std::istream & is, const PlyProperty & property)
-{
-    std::string skip;
-    if (property.isList)
-    {
-        int listSize;
-        is >> listSize;
-        for (int i = 0; i < listSize; ++i) is >> skip;
-    }
-    else is >> skip;
 }
 
 class PlyElement
@@ -308,6 +195,7 @@ public:
         auto instance_counter = [&](const std::string & prop)
         {
             for (auto e : get_elements())
+            {
                 for (auto p : e.properties)
                 {
                     if (p.name == prop)
@@ -318,6 +206,7 @@ public:
                         
                     }
                 }
+            }
             return 0;
         };
         
@@ -340,7 +229,7 @@ public:
         uint32_t totalInstanceSize = [&]() { uint32_t t = 0; for (auto c : instanceCounts) { t += c; } return t; }();
         if ((totalInstanceSize / propertyKeys.size()) == instanceCounts[0])
         {
-            source.resize(totalInstanceSize); // elements like the Levoy tristrip break this convention
+            source.resize(totalInstanceSize); // this satisfies regular properties; cursor->realloc is for list types
             cursor->offset = 0;
             cursor->vector = &source;
             cursor->data = reinterpret_cast<uint8_t *>(source.data());
@@ -384,7 +273,15 @@ public:
     }
     
 private:
-        
+    
+    uint32_t skip_property(uint32_t & fileOffset, const PlyProperty & property, const uint8_t * src);
+    void skip_property(std::istream & is, const PlyProperty & property);
+    
+    void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, const uint8_t * src, uint32_t & srcOffset);
+    void read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is);
+    void write_property_ascii(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset);
+    void write_property_binary(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset);
+    
     bool parse_header(std::istream & is);
     void write_header(std::ostringstream & os);
     
