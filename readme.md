@@ -9,9 +9,6 @@ A two-file, public domain implemention of the PLY mesh file format.
 
 ## ToDo
   * [ ] debugging output / stream operators
-  * [ ] support big-endian
-  * [ ] clean + refactor API
-  * [ ] test import/export from various apps
   * [ ] documentation
   * [ ] example apps (quad mesh, textures, etc)
 
