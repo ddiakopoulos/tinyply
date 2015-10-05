@@ -68,6 +68,7 @@ void write_ply_example(const std::string & filename)
     uvCoords = { .50f, .55f, .60f, .65f, .70f, .75f, .125f, .225f, .325f, .425f, .525f, .625f};
     faceColors = {105, 205, 105, 205, 150, 250, 150, 250};
     
+    // Tinyply does not perform any file i/o internally
     std::ofstream outputFile(filename);
     std::ostringstream outputStream;
     
@@ -77,6 +78,7 @@ void write_ply_example(const std::string & filename)
     myFile.add_properties_to_element("vertex", {"nx", "ny", "nz"}, norms);
     myFile.add_properties_to_element("vertex", {"red", "green", "blue", "alpha"}, colors);
     
+    // List property types must also be created with a count and type.
     myFile.add_properties_to_element("face", {"vertex_indices"}, faces, 3, PlyProperty::Type::INT8);
     myFile.add_properties_to_element("face", {"texcoord"}, uvCoords, 6, PlyProperty::Type::INT8);
     myFile.add_properties_to_element("face", {"red", "green", "blue", "alpha"}, faceColors);
@@ -90,13 +92,30 @@ void write_ply_example(const std::string & filename)
 
 void read_ply_file(const std::string & filename)
 {
+    // Tinyply can and will throw exceptions at you!
     try
     {
+        // Read the file and create a std::istringstream suitable
+        // for the lib -- tinyply does not perform any file i/o.
         auto f = read_file_binary(filename);
         std::istringstream ss((char*)f.data(), std::ios::binary);
-
+        
+        // Parse the ASCII header fields
         PlyFile file(ss);
 
+        for (auto e : file.get_elements())
+        {
+            std::cout << "element - " << e.name << " (" << e.size << ")" << std::endl;
+            for (auto p : e.properties)
+            {
+                std::cout << "\t property - " << p.name << " (" << PropertyTable[p.propertyType].str << ")" << std::endl;
+            }
+        }
+        std::cout << std::endl;
+        
+        // Define containers to hold the extracted data. The type must match
+        // the property type given in the header. Tinyply will interally allocate the
+        // the appropriate amount of memory.
         std::vector<float> verts;
         std::vector<float> norms;
         std::vector<uint8_t> colors;
@@ -105,29 +124,27 @@ void read_ply_file(const std::string & filename)
         std::vector<float> uvCoords;
         std::vector<uint8_t> faceColors;
 
-        for (auto e : file.get_elements())
-        {
-            std::cout << "element - " << e.name << " (" << e.size << ")" << std::endl;
-            for (auto p : e.properties)
-            {
-                std::cout << "\t property - " << p.name << std::endl;
-            }
-        }
-        std::cout << std::endl;
-
+        // The count returns the number of instances of the property group. The vectors
+        // above will be resized into a multiple of the property group size as
+        // they are "flattened"... i.e. verts = {x, y, z, x, y, z, ...}
         uint32_t vertexCount = file.request_properties_from_element("vertex", {"x", "y", "z"}, verts);
         uint32_t normalCount = file.request_properties_from_element("vertex", {"nx", "ny", "nz"}, norms);
         uint32_t colorCount = file.request_properties_from_element("vertex", {"red", "green", "blue", "alpha"}, colors);
         
-        uint32_t faceCount = file.request_properties_from_element("face", {"vertex_indices"}, faces);
-        uint32_t uvCount = file.request_properties_from_element("face", {"texcoord"}, uvCoords);
+        // For properties that are list types, it is possibly to specify the expected count (ideal if a
+        // consumer of this library knows the layout of their format a-priori). Otherwise, tinyply
+        // defers allocation of memory until the first instance of the property has been found
+        // as part of the read operation.
+        uint32_t faceCount = file.request_properties_from_element("face", {"vertex_indices"}, faces, 3);
+        uint32_t uvCount = file.request_properties_from_element("face", {"texcoord"}, uvCoords, 6);
         uint32_t faceColorCount = file.request_properties_from_element("face", {"red", "green", "blue", "alpha"}, faceColors);
         
+        // Now populate the vectors with data.
         timepoint before = now();
-        file.read(ss, f);
+        file.read(ss);
         timepoint after = now();
 
-        // Good place to put a breakpoint
+        // Good place to put a breakpoint!
         std::cout << "Read " << verts.size() << " vertex properties in " << difference_micros(before, after) << "μs" << std::endl;
     }
     catch (std::exception e)

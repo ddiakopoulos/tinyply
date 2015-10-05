@@ -109,24 +109,27 @@ void PlyFile::read_header_property(std::istream & is)
     get_elements().back().properties.emplace_back(is);
 }
 
-uint32_t PlyFile::skip_property(uint32_t & fileOffset, const PlyProperty & property, const uint8_t * src)
+uint32_t PlyFile::skip_property_binary(const PlyProperty & property, std::istream & is)
 {
+    char * skip = new char[PropertyTable[property.propertyType].stride];
     if (property.isList)
     {
         uint32_t listSize = 0;
         uint32_t dummyCount = 0;
-        read_property(property.listType, &listSize, dummyCount, src, fileOffset);
-        for (uint32_t i = 0; i < listSize; ++i) fileOffset += PropertyTable[property.propertyType].stride;
+        read_property_binary(property.listType, &listSize, dummyCount, is);
+        for (uint32_t i = 0; i < listSize; ++i) is.read(skip, PropertyTable[property.propertyType].stride);
+        delete[] skip;
         return listSize;
     }
     else
     {
-        fileOffset += PropertyTable[property.propertyType].stride;
+        is.read(skip, PropertyTable[property.propertyType].stride);
+        delete[] skip;
         return 0;
     }
 }
 
-void PlyFile::skip_property(std::istream & is, const PlyProperty & property)
+void PlyFile::skip_property_ascii(const PlyProperty & property, std::istream & is)
 {
     std::string skip;
     if (property.isList)
@@ -138,26 +141,26 @@ void PlyFile::skip_property(std::istream & is, const PlyProperty & property)
     else is >> skip;
 }
 
-
-void PlyFile::read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, const uint8_t * src, uint32_t & srcOffset)
+void PlyFile::read_property_binary(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is)
 {
+    uint8_t * src = new uint8_t[PropertyTable[t].stride];
+    is.read(reinterpret_cast<char*>(src), PropertyTable[t].stride);
     switch (t)
     {
-        case PlyProperty::Type::INT8:       ply_cast<int8_t>(dest, src + srcOffset);    break;
-        case PlyProperty::Type::UINT8:      ply_cast<uint8_t>(dest, src + srcOffset);   break;
-        case PlyProperty::Type::INT16:      ply_cast<int16_t>(dest, src+ srcOffset);    break;
-        case PlyProperty::Type::UINT16:     ply_cast<uint16_t>(dest, src + srcOffset);  break;
-        case PlyProperty::Type::INT32:      ply_cast<int32_t>(dest, src + srcOffset);   break;
-        case PlyProperty::Type::UINT32:     ply_cast<uint32_t>(dest, src + srcOffset);  break;
-        case PlyProperty::Type::FLOAT32:    ply_cast<float>(dest, src + srcOffset);     break;
-        case PlyProperty::Type::FLOAT64:    ply_cast<double>(dest, src + srcOffset);    break;
+        case PlyProperty::Type::INT8:       ply_cast<int8_t>(dest, src);    break;
+        case PlyProperty::Type::UINT8:      ply_cast<uint8_t>(dest, src);   break;
+        case PlyProperty::Type::INT16:      ply_cast<int16_t>(dest, src);   break;
+        case PlyProperty::Type::UINT16:     ply_cast<uint16_t>(dest, src);  break;
+        case PlyProperty::Type::INT32:      ply_cast<int32_t>(dest, src);   break;
+        case PlyProperty::Type::UINT32:     ply_cast<uint32_t>(dest, src);  break;
+        case PlyProperty::Type::FLOAT32:    ply_cast<float>(dest, src);     break;
+        case PlyProperty::Type::FLOAT64:    ply_cast<double>(dest, src);    break;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
     destOffset += PropertyTable[t].stride;
-    srcOffset += PropertyTable[t].stride;
 }
 
-void PlyFile::read_property(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is)
+void PlyFile::read_property_ascii(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is)
 {
     switch (t)
     {
@@ -198,10 +201,9 @@ void PlyFile::write_property_binary(PlyProperty::Type t, std::ostringstream & os
     srcOffset += PropertyTable[t].stride;
 }
 
-void PlyFile::read(std::istream & is, const std::vector<uint8_t> & buffer)
+void PlyFile::read(std::istream & is)
 {
-    if (isBinary) read_binary_internal(is, buffer);
-    else read_ascii_internal(is, buffer);
+    read_internal(is);
 }
 
 void PlyFile::write(std::ostringstream & os, bool isBinary)
@@ -292,8 +294,8 @@ void PlyFile::write_header(std::ostringstream & os)
         {
             if (p.isList)
             {
-              os << "property list " << PropertyTable[p.listType].str << " "
-                 << PropertyTable[p.propertyType].str << " " << p.name << std::endl;
+                os << "property list " << PropertyTable[p.listType].str << " "
+                << PropertyTable[p.propertyType].str << " " << p.name << std::endl;
             }
             else
             {
@@ -304,12 +306,21 @@ void PlyFile::write_header(std::ostringstream & os)
     os << "end_header" << std::endl;
 }
 
-void PlyFile::read_binary_internal(std::istream & is, const std::vector<uint8_t> & buffer)
+void PlyFile::read_internal(std::istream & is)
 {
-    uint32_t fileOffset = 0;
-    const size_t headerPosition = is.tellg();
-    const uint8_t * srcBuffer = buffer.data() + headerPosition;
-
+    std::function<void(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is)> read;
+    std::function<void(const PlyProperty & property, std::istream & is)> skip;
+    if (isBinary)
+    {
+        read = [&](PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is) { read_property_binary(t, dest, destOffset, is); };
+        skip = [&](const PlyProperty & property, std::istream & is) { skip_property_binary(property, is); };
+    }
+    else
+    {
+        read = [&](PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is) { read_property_ascii(t, dest, destOffset, is); };
+        skip = [&](const PlyProperty & property, std::istream & is) { skip_property_ascii(property, is); };
+    }
+    
     for (auto & element : get_elements())
     {
         if (std::find(requestedElements.begin(), requestedElements.end(), element.name) != requestedElements.end())
@@ -324,48 +335,7 @@ void PlyFile::read_binary_internal(std::istream & is, const std::vector<uint8_t>
                         {
                             uint32_t listSize = 0;
                             uint32_t dummyCount = 0;
-                            read_property(property.listType, &listSize, dummyCount, srcBuffer, fileOffset);
-                            if (cursor->realloc == false)
-                            {
-                                cursor->realloc = true;
-                                resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
-                            }
-							for (auto i = 0; i < listSize; ++i)
-								read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
-                        }
-                        else
-                        {
-                            read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, srcBuffer, fileOffset);
-                        }
-                    }
-                    else
-                    {
-                        skip_property(fileOffset, property, srcBuffer);
-                    }
-                }
-            }
-        }
-        else continue;
-    }
-}
-
-void PlyFile::read_ascii_internal(std::istream & is, const std::vector<uint8_t> & buffer)
-{
-    for (auto & element : get_elements())
-    {
-        if (std::find(requestedElements.begin(), requestedElements.end(), element.name) != requestedElements.end())
-        {
-            for (int64_t count = 0; count < element.size; ++count)
-            {
-                for (auto & property : element.properties)
-                {
-                    if (auto & cursor = userDataTable[make_key(element.name, property.name)])
-                    {
-                        if (property.isList)
-                        {
-                            int32_t listSize = 0;
-                            uint32_t dummyCount = 0;
-                            read_property(property.listType, &listSize, dummyCount, is);
+                            read(property.listType, &listSize, dummyCount, is);
                             if (cursor->realloc == false)
                             {
                                 cursor->realloc = true;
@@ -373,17 +343,17 @@ void PlyFile::read_ascii_internal(std::istream & is, const std::vector<uint8_t> 
                             }
                             for (auto i = 0; i < listSize; ++i)
                             {
-                                read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
+                                read(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
                             }
                         }
                         else
                         {
-                            read_property(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
+                            read(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
                         }
                     }
                     else
                     {
-                        skip_property(is, property);
+                        skip(property, is);
                     }
                 }
             }
