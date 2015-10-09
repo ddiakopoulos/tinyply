@@ -67,7 +67,7 @@ namespace tinyply
     }
     
     template<typename T>
-    void ply_cast(void * dest, const uint8_t * src)
+    void ply_cast(void * dest, const char * src)
     {
         *(static_cast<T *>(dest)) = *(reinterpret_cast<const T *>(src));
     }

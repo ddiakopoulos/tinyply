@@ -111,20 +111,18 @@ void PlyFile::read_header_property(std::istream & is)
 
 uint32_t PlyFile::skip_property_binary(const PlyProperty & property, std::istream & is)
 {
-    char * skip = new char[PropertyTable[property.propertyType].stride];
+    static std::vector<char> skip(PropertyTable[property.propertyType].stride);
     if (property.isList)
     {
         uint32_t listSize = 0;
         uint32_t dummyCount = 0;
         read_property_binary(property.listType, &listSize, dummyCount, is);
-        for (uint32_t i = 0; i < listSize; ++i) is.read(skip, PropertyTable[property.propertyType].stride);
-        delete[] skip;
+        for (uint32_t i = 0; i < listSize; ++i) is.read(skip.data(), PropertyTable[property.propertyType].stride);
         return listSize;
     }
     else
     {
-        is.read(skip, PropertyTable[property.propertyType].stride);
-        delete[] skip;
+        is.read(skip.data(), PropertyTable[property.propertyType].stride);
         return 0;
     }
 }
@@ -143,18 +141,18 @@ void PlyFile::skip_property_ascii(const PlyProperty & property, std::istream & i
 
 void PlyFile::read_property_binary(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is)
 {
-    uint8_t * src = new uint8_t[PropertyTable[t].stride];
-    is.read(reinterpret_cast<char*>(src), PropertyTable[t].stride);
+    static std::vector<char> src(PropertyTable[t].stride);
+    is.read(src.data(), PropertyTable[t].stride);
     switch (t)
     {
-        case PlyProperty::Type::INT8:       ply_cast<int8_t>(dest, src);    break;
-        case PlyProperty::Type::UINT8:      ply_cast<uint8_t>(dest, src);   break;
-        case PlyProperty::Type::INT16:      ply_cast<int16_t>(dest, src);   break;
-        case PlyProperty::Type::UINT16:     ply_cast<uint16_t>(dest, src);  break;
-        case PlyProperty::Type::INT32:      ply_cast<int32_t>(dest, src);   break;
-        case PlyProperty::Type::UINT32:     ply_cast<uint32_t>(dest, src);  break;
-        case PlyProperty::Type::FLOAT32:    ply_cast<float>(dest, src);     break;
-        case PlyProperty::Type::FLOAT64:    ply_cast<double>(dest, src);    break;
+        case PlyProperty::Type::INT8:       ply_cast<int8_t>(dest, src.data());    break;
+        case PlyProperty::Type::UINT8:      ply_cast<uint8_t>(dest, src.data());   break;
+        case PlyProperty::Type::INT16:      ply_cast<int16_t>(dest, src.data());   break;
+        case PlyProperty::Type::UINT16:     ply_cast<uint16_t>(dest, src.data());  break;
+        case PlyProperty::Type::INT32:      ply_cast<int32_t>(dest, src.data());   break;
+        case PlyProperty::Type::UINT32:     ply_cast<uint32_t>(dest, src.data());  break;
+        case PlyProperty::Type::FLOAT32:    ply_cast<float>(dest, src.data());     break;
+        case PlyProperty::Type::FLOAT64:    ply_cast<double>(dest, src.data());    break;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
     destOffset += PropertyTable[t].stride;
