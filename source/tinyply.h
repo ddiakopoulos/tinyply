@@ -205,13 +205,14 @@ namespace tinyply
             else return 0;
             
             // count and verify large enough
-            auto instance_counter = [&](const std::string & prop)
+            auto instance_counter = [&](const std::string & elementKey, const std::string & propertyKey)
             {
                 for (auto e : get_elements())
                 {
+                    if (e.name != elementKey) continue;
                     for (auto p : e.properties)
                     {
-                        if (p.name == prop)
+                        if (p.name == propertyKey)
                         {
                             if (PropertyTable[property_type_for_type(source)].stride != PropertyTable[p.propertyType].stride)
                                 throw std::runtime_error("destination vector is wrongly typed to hold this property");
@@ -230,7 +231,7 @@ namespace tinyply
             
             for (auto key : propertyKeys)
             {
-                if (int instanceCount = instance_counter(key))
+                if (int instanceCount = instance_counter(elementKey, key))
                 {
                     instanceCounts.push_back(instanceCount);
                     auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(make_key(elementKey, key), cursor));
