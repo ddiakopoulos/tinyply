@@ -124,7 +124,7 @@ void read_ply_file(const std::string & filename)
         // Good place to put a breakpoint!
         std::cout << "Read " << verts.size() << " vertex properties in " << difference_micros(before, after) << "μs" << std::endl;
     }
-    catch (std::exception e)
+    catch (const std::exception & e)
     {
         std::cerr << "Caught exception: " << e.what() << std::endl;
     }
