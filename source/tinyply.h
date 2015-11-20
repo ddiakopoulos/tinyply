@@ -202,7 +202,7 @@ namespace tinyply
                 if (std::find(requestedElements.begin(), requestedElements.end(), elementKey) == requestedElements.end())
                     requestedElements.push_back(elementKey);
             }
-            else throw std::invalid_argument("requested unknown element: " + elementKey);
+            else return 0;
             
             // count and verify large enough
             auto instance_counter = [&](const std::string & prop)
@@ -237,7 +237,7 @@ namespace tinyply
                     if (result.second == false)
                         throw std::runtime_error("property has already been requested: " + key);
                 }
-                else throw std::invalid_argument("requested unknown property: " + key);
+                else return 0;
             }
             
             uint32_t totalInstanceSize = [&]() { uint32_t t = 0; for (auto c : instanceCounts) { t += c; } return t; }() * listCount;
