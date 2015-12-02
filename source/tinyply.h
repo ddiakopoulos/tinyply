@@ -16,6 +16,7 @@
 #include <sstream>
 #include <type_traits>
 #include <memory>
+#include <functional>
 
 namespace tinyply
 {
