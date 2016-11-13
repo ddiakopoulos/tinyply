@@ -306,8 +306,8 @@ namespace tinyply
         void read_header_format(std::istream & is);
         void read_header_element(std::istream & is);
         void read_header_property(std::istream & is);
-        void read_header_text(std::string line, std::istream & is, std::vector<std::string> place, int erase = 0);
-        
+        void read_header_text(std::string line, std::istream &is, std::vector<std::string> &place, int erase = 0);
+
         void read_internal(std::istream & is);
         
         void write_ascii_internal(std::ostringstream & os);

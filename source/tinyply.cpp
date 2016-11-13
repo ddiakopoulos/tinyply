@@ -73,18 +73,18 @@ bool PlyFile::parse_header(std::istream& is)
             gotMagic = true;
             continue;
         }
-        else if (token == "comment")    read_header_text(line, ls, comments, 7);
+        else if (token == "comment")    read_header_text(line, ls, comments, 8);
         else if (token == "format")     read_header_format(ls);
         else if (token == "element")    read_header_element(ls);
         else if (token == "property")   read_header_property(ls);
-        else if (token == "obj_info")   read_header_text(line, ls, objInfo, 7);
+        else if (token == "obj_info")   read_header_text(line, ls, objInfo, 8);
         else if (token == "end_header") break;
         else return false;
     }
     return true;
 }
 
-void PlyFile::read_header_text(std::string line, std::istream & is, std::vector<std::string> place, int erase)
+void PlyFile::read_header_text(std::string line, std::istream & is, std::vector<std::string>& place, int erase)
 {
     place.push_back((erase > 0) ? line.erase(0, erase) : line);
 }
