@@ -77,7 +77,7 @@ bool PlyFile::parse_header(std::istream& is)
         else if (token == "format")     read_header_format(ls);
         else if (token == "element")    read_header_element(ls);
         else if (token == "property")   read_header_property(ls);
-        else if (token == "obj_info")   read_header_text(line, ls, objInfo, 8);
+        else if (token == "obj_info")   read_header_text(line, ls, objInfo, 9);
         else if (token == "end_header") break;
         else return false;
     }
