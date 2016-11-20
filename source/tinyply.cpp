@@ -109,15 +109,15 @@ void PlyFile::read_header_property(std::istream & is)
     get_elements().back().properties.emplace_back(is);
 }
 
-uint32_t PlyFile::skip_property_binary(const PlyProperty & property, std::istream & is)
+size_t PlyFile::skip_property_binary(const PlyProperty & property, std::istream & is)
 {
     static std::vector<char> skip(PropertyTable[property.propertyType].stride);
     if (property.isList)
     {
-        uint32_t listSize = 0;
-        uint32_t dummyCount = 0;
+		size_t listSize = 0;
+		size_t dummyCount = 0;
         read_property_binary(property.listType, &listSize, dummyCount, is);
-        for (uint32_t i = 0; i < listSize; ++i) is.read(skip.data(), PropertyTable[property.propertyType].stride);
+        for (size_t i = 0; i < listSize; ++i) is.read(skip.data(), PropertyTable[property.propertyType].stride);
         return listSize;
     }
     else
@@ -139,7 +139,7 @@ void PlyFile::skip_property_ascii(const PlyProperty & property, std::istream & i
     else is >> skip;
 }
 
-void PlyFile::read_property_binary(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is)
+void PlyFile::read_property_binary(PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is)
 {
     static std::vector<char> src(PropertyTable[t].stride);
     is.read(src.data(), PropertyTable[t].stride);
@@ -158,7 +158,7 @@ void PlyFile::read_property_binary(PlyProperty::Type t, void * dest, uint32_t & 
     destOffset += PropertyTable[t].stride;
 }
 
-void PlyFile::read_property_ascii(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is)
+void PlyFile::read_property_ascii(PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is)
 {
     switch (t)
     {
@@ -175,7 +175,7 @@ void PlyFile::read_property_ascii(PlyProperty::Type t, void * dest, uint32_t & d
     destOffset += PropertyTable[t].stride;
 }
 
-void PlyFile::write_property_ascii(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
+void PlyFile::write_property_ascii(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, size_t & srcOffset)
 {
     switch (t)
     {
@@ -193,7 +193,7 @@ void PlyFile::write_property_ascii(PlyProperty::Type t, std::ostringstream & os,
     srcOffset += PropertyTable[t].stride;
 }
 
-void PlyFile::write_property_binary(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset)
+void PlyFile::write_property_binary(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, size_t & srcOffset)
 {
     os.write(reinterpret_cast<const char *>(src), PropertyTable[t].stride);
     srcOffset += PropertyTable[t].stride;
@@ -217,7 +217,7 @@ void PlyFile::write_binary_internal(std::ostringstream & os)
     
     for (auto & e : elements)
     {
-        for (int i = 0; i < e.size; ++i)
+        for (size_t i = 0; i < e.size; ++i)
         {
             for (auto & p : e.properties)
             {
@@ -226,7 +226,7 @@ void PlyFile::write_binary_internal(std::ostringstream & os)
                 {
                     uint8_t listSize[4] = {0, 0, 0, 0};
                     memcpy(listSize, &p.listCount, sizeof(uint32_t));
-                    uint32_t dummyCount = 0;
+					size_t dummyCount = 0;
                     write_property_binary(p.listType, os, listSize, dummyCount);
                     for (int j = 0; j < p.listCount; ++j)
                     {
@@ -248,7 +248,7 @@ void PlyFile::write_ascii_internal(std::ostringstream & os)
     
     for (auto & e : elements)
     {
-        for (int i = 0; i < e.size; ++i)
+        for (size_t i = 0; i < e.size; ++i)
         {
             for (auto & p : e.properties)
             {
@@ -306,16 +306,16 @@ void PlyFile::write_header(std::ostringstream & os)
 
 void PlyFile::read_internal(std::istream & is)
 {
-    std::function<void(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is)> read;
+    std::function<void(PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is)> read;
     std::function<void(const PlyProperty & property, std::istream & is)> skip;
     if (isBinary)
     {
-        read = [&](PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is) { read_property_binary(t, dest, destOffset, is); };
+        read = [&](PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is) { read_property_binary(t, dest, destOffset, is); };
         skip = [&](const PlyProperty & property, std::istream & is) { skip_property_binary(property, is); };
     }
     else
     {
-        read = [&](PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is) { read_property_ascii(t, dest, destOffset, is); };
+        read = [&](PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is) { read_property_ascii(t, dest, destOffset, is); };
         skip = [&](const PlyProperty & property, std::istream & is) { skip_property_ascii(property, is); };
     }
     
@@ -331,15 +331,15 @@ void PlyFile::read_internal(std::istream & is)
                     {
                         if (property.isList)
                         {
-                            uint32_t listSize = 0;
-                            uint32_t dummyCount = 0;
+							size_t listSize = 0;
+							size_t dummyCount = 0;
                             read(property.listType, &listSize, dummyCount, is);
                             if (cursor->realloc == false)
                             {
                                 cursor->realloc = true;
                                 resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
                             }
-                            for (auto i = 0; i < listSize; ++i)
+                            for (size_t i = 0; i < listSize; ++i)
                             {
                                 read(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
                             }

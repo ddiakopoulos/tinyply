@@ -25,7 +25,7 @@ namespace tinyply
     {
         void * vector;
         uint8_t * data;
-        uint32_t offset;
+		size_t offset;
         bool realloc = false;
     };
     
@@ -115,14 +115,14 @@ namespace tinyply
     }
     
     template<typename T>
-    inline uint8_t * resize(void * v, int32_t newSize)
+    inline uint8_t * resize(void * v, size_t newSize)
     {
         auto vec = static_cast<std::vector<T> *>(v);
         vec->resize(newSize);
         return reinterpret_cast<uint8_t *>(vec->data());
     }
     
-    inline void resize_vector(const PlyProperty::Type t, void * v, int32_t newSize, uint8_t *& ptr)
+    inline void resize_vector(const PlyProperty::Type t, void * v, size_t newSize, uint8_t *& ptr)
     {
         switch (t)
         {
@@ -160,7 +160,7 @@ namespace tinyply
         PlyElement(std::istream & istream);
         PlyElement(const std::string & name, int count) : name(name), size(count) {}
         std::string name;
-        int size;
+		size_t size;
         std::vector<PlyProperty> properties;
         
     private:
@@ -171,8 +171,13 @@ namespace tinyply
     
     inline int find_element(const std::string key, std::vector<PlyElement> & list)
     {
-        for (int i = 0; i < list.size(); ++i)
-            if (list[i].name == key) return i;
+		for (size_t i = 0; i < list.size(); ++i)
+		{
+			if (list[i].name == key)
+			{
+				return i;
+			}
+		}
         return -1;
     }
     
@@ -193,7 +198,7 @@ namespace tinyply
         std::vector<std::string> objInfo;
         
         template<typename T>
-        int request_properties_from_element(std::string elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source, int listCount = 1)
+		size_t request_properties_from_element(const std::string & elementKey, const std::vector<std::string> & propertyKeys, std::vector<T> & source, const int listCount = 1)
         {
             if (get_elements().size() == 0)
                 return 0;
@@ -222,13 +227,13 @@ namespace tinyply
                         }
                     }
                 }
-                return 0;
+                return size_t(0);
             };
             
             // Properties in the userDataTable share the same cursor
             auto cursor = std::make_shared<DataCursor>();
             
-            std::vector<uint32_t> instanceCounts;
+            std::vector<size_t> instanceCounts;
             
             for (auto key : propertyKeys)
             {
@@ -237,12 +242,12 @@ namespace tinyply
                     instanceCounts.push_back(instanceCount);
                     auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(make_key(elementKey, key), cursor));
                     if (result.second == false)
-                        throw std::runtime_error("property has already been requested: " + key);
+                        throw std::invalid_argument("property has already been requested: " + key);
                 }
                 else return 0;
             }
             
-            uint32_t totalInstanceSize = [&]() { uint32_t t = 0; for (auto c : instanceCounts) { t += c; } return t; }() * listCount;
+			size_t totalInstanceSize = [&]() { size_t t = 0; for (auto c : instanceCounts) { t += c; } return t; }() * listCount;
             source.resize(totalInstanceSize); // this satisfies regular properties; cursor->realloc is for list types
             cursor->offset = 0;
             cursor->vector = &source;
@@ -292,13 +297,13 @@ namespace tinyply
         
     private:
         
-        uint32_t skip_property_binary(const PlyProperty & property, std::istream & is);
+		size_t skip_property_binary(const PlyProperty & property, std::istream & is);
         void skip_property_ascii(const PlyProperty & property, std::istream & is);
         
-        void read_property_binary(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is);
-        void read_property_ascii(PlyProperty::Type t, void * dest, uint32_t & destOffset, std::istream & is);
-        void write_property_ascii(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset);
-        void write_property_binary(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, uint32_t & srcOffset);
+        void read_property_binary(PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is);
+        void read_property_ascii(PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is);
+        void write_property_ascii(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, size_t & srcOffset);
+        void write_property_binary(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, size_t & srcOffset);
         
         bool parse_header(std::istream & is);
         void write_header(std::ostringstream & os);
@@ -306,7 +311,7 @@ namespace tinyply
         void read_header_format(std::istream & is);
         void read_header_element(std::istream & is);
         void read_header_property(std::istream & is);
-        void read_header_text(std::string line, std::istream &is, std::vector<std::string> &place, int erase = 0);
+        void read_header_text(std::string line, std::istream & is, std::vector<std::string> & place, int erase = 0);
 
         void read_internal(std::istream & is);
         
@@ -322,6 +327,6 @@ namespace tinyply
         std::vector<std::string> requestedElements;
     };
     
-} // tinyply
+} // namesapce tinyply
 
 #endif // tinyply_h
