@@ -17,6 +17,7 @@
 #include <type_traits>
 #include <memory>
 #include <functional>
+#include <cstring>
 
 namespace tinyply
 {
