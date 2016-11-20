@@ -59,7 +59,7 @@ PlyFile::PlyFile(std::istream & is)
     }
 }
 
-bool PlyFile::parse_header(std::istream& is)
+bool PlyFile::parse_header(std::istream & is)
 {
     std::string line;
     bool gotMagic = false;
@@ -93,10 +93,8 @@ void PlyFile::read_header_format(std::istream & is)
 {
     std::string s;
     (is >> s);
-    if (s == "binary_little_endian")
-        isBinary = true;
-    else if (s == "binary_big_endian")
-        throw std::runtime_error("big endian formats are not supported!");
+	if (s == "binary_little_endian") isBinary = true;
+	else if (s == "binary_big_endian") isBinary = isBigEndian = true;
 }
 
 void PlyFile::read_header_element(std::istream & is)
@@ -143,16 +141,17 @@ void PlyFile::read_property_binary(PlyProperty::Type t, void * dest, size_t & de
 {
     static std::vector<char> src(PropertyTable[t].stride);
     is.read(src.data(), PropertyTable[t].stride);
+
     switch (t)
     {
-        case PlyProperty::Type::INT8:       ply_cast<int8_t>(dest, src.data());    break;
-        case PlyProperty::Type::UINT8:      ply_cast<uint8_t>(dest, src.data());   break;
-        case PlyProperty::Type::INT16:      ply_cast<int16_t>(dest, src.data());   break;
-        case PlyProperty::Type::UINT16:     ply_cast<uint16_t>(dest, src.data());  break;
-        case PlyProperty::Type::INT32:      ply_cast<int32_t>(dest, src.data());   break;
-        case PlyProperty::Type::UINT32:     ply_cast<uint32_t>(dest, src.data());  break;
-        case PlyProperty::Type::FLOAT32:    ply_cast<float>(dest, src.data());     break;
-        case PlyProperty::Type::FLOAT64:    ply_cast<double>(dest, src.data());    break;
+        case PlyProperty::Type::INT8:       ply_cast<int8_t>(dest, src.data(), isBigEndian);    break;
+        case PlyProperty::Type::UINT8:      ply_cast<uint8_t>(dest, src.data(), isBigEndian);   break;
+        case PlyProperty::Type::INT16:      ply_cast<int16_t>(dest, src.data(), isBigEndian);   break;
+        case PlyProperty::Type::UINT16:     ply_cast<uint16_t>(dest, src.data(), isBigEndian);  break;
+        case PlyProperty::Type::INT32:      ply_cast<int32_t>(dest, src.data(), isBigEndian);   break;
+        case PlyProperty::Type::UINT32:     ply_cast<uint32_t>(dest, src.data(), isBigEndian);  break;
+        case PlyProperty::Type::FLOAT32:    ply_cast<float>(dest, src.data(), isBigEndian);     break;
+        case PlyProperty::Type::FLOAT64:    ply_cast<double>(dest, src.data(), isBigEndian);    break;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
     destOffset += PropertyTable[t].stride;
@@ -175,7 +174,7 @@ void PlyFile::read_property_ascii(PlyProperty::Type t, void * dest, size_t & des
     destOffset += PropertyTable[t].stride;
 }
 
-void PlyFile::write_property_ascii(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, size_t & srcOffset)
+void PlyFile::write_property_ascii(PlyProperty::Type t, std::ostream & os, uint8_t * src, size_t & srcOffset)
 {
     switch (t)
     {
@@ -193,9 +192,9 @@ void PlyFile::write_property_ascii(PlyProperty::Type t, std::ostringstream & os,
     srcOffset += PropertyTable[t].stride;
 }
 
-void PlyFile::write_property_binary(PlyProperty::Type t, std::ostringstream & os, uint8_t * src, size_t & srcOffset)
+void PlyFile::write_property_binary(PlyProperty::Type t, std::ostream & os, uint8_t * src, size_t & srcOffset)
 {
-    os.write(reinterpret_cast<const char *>(src), PropertyTable[t].stride);
+    os.write((char *)src, PropertyTable[t].stride);
     srcOffset += PropertyTable[t].stride;
 }
 
@@ -204,17 +203,17 @@ void PlyFile::read(std::istream & is)
     read_internal(is);
 }
 
-void PlyFile::write(std::ostringstream & os, bool isBinary)
+void PlyFile::write(std::ostream & os, bool isBinary)
 {
     if (isBinary) write_binary_internal(os);
     else write_ascii_internal(os);
 }
 
-void PlyFile::write_binary_internal(std::ostringstream & os)
+void PlyFile::write_binary_internal(std::ostream & os)
 {
     isBinary = true;
     write_header(os);
-    
+
     for (auto & e : elements)
     {
         for (size_t i = 0; i < e.size; ++i)
@@ -242,7 +241,7 @@ void PlyFile::write_binary_internal(std::ostringstream & os)
     }
 }
 
-void PlyFile::write_ascii_internal(std::ostringstream & os)
+void PlyFile::write_ascii_internal(std::ostream & os)
 {
     write_header(os);
     
@@ -271,7 +270,7 @@ void PlyFile::write_ascii_internal(std::ostringstream & os)
     }
 }
 
-void PlyFile::write_header(std::ostringstream & os)
+void PlyFile::write_header(std::ostream & os)
 {
     const std::locale & fixLoc = std::locale("C");
     os.imbue(fixLoc);
@@ -323,7 +322,7 @@ void PlyFile::read_internal(std::istream & is)
     {
         if (std::find(requestedElements.begin(), requestedElements.end(), element.name) != requestedElements.end())
         {
-            for (int64_t count = 0; count < element.size; ++count)
+            for (size_t count = 0; count < element.size; ++count)
             {
                 for (auto & property : element.properties)
                 {
