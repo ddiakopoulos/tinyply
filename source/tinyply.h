@@ -89,18 +89,10 @@ namespace tinyply
 	}
 
 	template<typename T>
-	void ply_cast(void * dest, const char * src, bool BigEndian)
+	void ply_cast(void * dest, const char * src, bool be)
 	{
 		*(static_cast<T *>(dest)) = *(reinterpret_cast<const T *>(src));
 	}
-
-	/*
-	template<typename T>
-	void ply_cast(void * dest, const char * src, bool bigEndian)
-	{
-		*(static_cast<T *>(dest)) = endian_swap(*(reinterpret_cast<const T *>(src)));
-	}
-	*/
 
 	template<typename T>
 	T ply_read_ascii(std::istream & is)
@@ -259,7 +251,28 @@ namespace tinyply
 				return size_t(0);
 			};
 
-			// Properties in the userDataTable share the same cursor
+			// Check if requested key is in the parsed header
+			bool invalidKeyRequested = false;
+			for (auto key : propertyKeys)
+			{
+				for (auto e : get_elements())
+				{
+					if (e.name != elementKey) continue;
+					std::vector<std::string> headerKeys;
+					for (auto p : e.properties)
+					{
+						headerKeys.push_back(p.name);
+					}
+
+					if (std::find(headerKeys.begin(), headerKeys.end(), key) == headerKeys.end())
+					{
+						// not in the requested vector
+					}
+
+				}
+			}
+
+			// All requested properties in the userDataTable share the same cursor (thrown into the same flat array)
 			auto cursor = std::make_shared<DataCursor>();
 
 			std::vector<size_t> instanceCounts;
@@ -273,11 +286,11 @@ namespace tinyply
 					if (result.second == false)
 						throw std::invalid_argument("property has already been requested: " + key);
 				}
-				else return 0;
+				else continue;
 			}
 
 			size_t totalInstanceSize = [&]() { size_t t = 0; for (auto c : instanceCounts) { t += c; } return t; }() * listCount;
-			source.resize(totalInstanceSize); // this satisfies regular properties; cursor->realloc is for list types
+			source.resize(totalInstanceSize); // this satisfies regular properties; `cursor->realloc` is for list types since tinyply uses single-pass parsing
 			cursor->offset = 0;
 			cursor->vector = &source;
 			cursor->data = reinterpret_cast<uint8_t *>(source.data());

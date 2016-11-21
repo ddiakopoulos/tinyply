@@ -166,6 +166,8 @@ void read_ply_file(const std::string & filename)
 		normalCount = file.request_properties_from_element("vertex", { "nx", "ny", "nz" }, norms);
 		colorCount = file.request_properties_from_element("vertex", { "red", "green", "blue", "alpha" }, colors);
 
+		std::cout << "Color count : " << colorCount << std::endl;
+
 		// For properties that are list types, it is possibly to specify the expected count (ideal if a
 		// consumer of this library knows the layout of their format a-priori). Otherwise, tinyply
 		// defers allocation of memory until the first instance of the property has been found
@@ -195,6 +197,6 @@ void read_ply_file(const std::string & filename)
 int main(int argc, char *argv[])
 {
 	write_ply_example("example_tetrahedron.ply");
-	read_ply_file("example_tetrahedron.ply");
+	read_ply_file("face.ply");
 	return 0;
 }
