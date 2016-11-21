@@ -52,7 +52,7 @@ namespace tinyply
 
 	class PlyProperty
 	{
-
+		void parse_internal(std::istream & is);
 	public:
 
 		enum class Type : uint8_t
@@ -76,11 +76,6 @@ namespace tinyply
 		bool isList;
 		int listCount = 0;
 		std::string name;
-
-	private:
-
-		void parse_internal(std::istream & is);
-
 	};
 
 	inline std::string make_key(const std::string & a, const std::string & b)
@@ -91,7 +86,7 @@ namespace tinyply
 	template<typename T>
 	void ply_cast(void * dest, const char * src, bool be)
 	{
-		*(static_cast<T *>(dest)) = *(reinterpret_cast<const T *>(src));
+		*(static_cast<T *>(dest)) = (be) ? endian_swap(*(reinterpret_cast<const T *>(src))) : *(reinterpret_cast<const T *>(src));
 	}
 
 	template<typename T>
@@ -219,7 +214,7 @@ namespace tinyply
 		std::vector<std::string> objInfo;
 
 		template<typename T>
-		size_t request_properties_from_element(const std::string & elementKey, const std::vector<std::string> & propertyKeys, std::vector<T> & source, const int listCount = 1)
+		size_t request_properties_from_element(const std::string & elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source, const int listCount = 1)
 		{
 			if (get_elements().size() == 0)
 				return 0;
@@ -252,7 +247,7 @@ namespace tinyply
 			};
 
 			// Check if requested key is in the parsed header
-			bool invalidKeyRequested = false;
+			std::vector<std::string> unusedKeys;
 			for (auto key : propertyKeys)
 			{
 				for (auto e : get_elements())
@@ -266,11 +261,18 @@ namespace tinyply
 
 					if (std::find(headerKeys.begin(), headerKeys.end(), key) == headerKeys.end())
 					{
-						// not in the requested vector
+						unusedKeys.push_back(key);
 					}
 
 				}
 			}
+
+			// Not using them? Don't let them affect the propertyKeys count used for calculating array sizes
+			for (auto k : unusedKeys)
+			{
+				propertyKeys.erase(std::remove(propertyKeys.begin(), propertyKeys.end(), k), propertyKeys.end());
+			}
+			if (!propertyKeys.size()) return 0;
 
 			// All requested properties in the userDataTable share the same cursor (thrown into the same flat array)
 			auto cursor = std::make_shared<DataCursor>();
