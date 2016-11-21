@@ -39,8 +39,8 @@ namespace tinyply
 	template<> inline int16_t endian_swap(const int16_t & v) { uint16_t r = endian_swap(*(uint16_t*)&v); return *(int16_t*)&r; }
 	template<> inline int32_t endian_swap(const int32_t & v) { uint32_t r = endian_swap(*(uint32_t*)&v); return *(int32_t*)&r; }
 	template<> inline int64_t endian_swap(const int64_t & v) { uint64_t r = endian_swap(*(uint64_t*)&v); return *(int64_t*)&r; }
-	template<> inline float endian_swap(const float & v) { return static_cast<float>(endian_swap(*(uint32_t*)&v)); }
-	template<> inline double endian_swap(const double & v) { return static_cast<double>(endian_swap(*(uint64_t*)&v)); }
+	inline float endian_swap_float(const uint32_t & v) { uint32_t r = endian_swap(v); return *(float*)&r; }
+	inline double endian_swap_double(const uint64_t & v) { uint64_t r = endian_swap(v); return *(double*)&r; }
 
 	struct DataCursor
 	{
@@ -90,6 +90,18 @@ namespace tinyply
 	}
 
 	template<typename T>
+	void ply_cast_float(void * dest, const char * src, bool be)
+	{
+		*(static_cast<T *>(dest)) = (be) ? endian_swap_float(*(reinterpret_cast<const uint32_t *>(src))) : *(reinterpret_cast<const T *>(src));
+	}
+
+	template<typename T>
+	void ply_cast_double(void * dest, const char * src, bool be)
+	{
+		*(static_cast<T *>(dest)) = (be) ? endian_swap_double(*(reinterpret_cast<const uint64_t *>(src))) : *(reinterpret_cast<const T *>(src));
+	}
+
+	template<typename T>
 	T ply_read_ascii(std::istream & is)
 	{
 		T data;
@@ -119,12 +131,12 @@ namespace tinyply
 
 	inline PlyProperty::Type property_type_from_string(const std::string & t)
 	{
-		if (t == "int8" || t == "char")     return PlyProperty::Type::INT8;
-		else if (t == "uint8" || t == "uchar")    return PlyProperty::Type::UINT8;
-		else if (t == "int16" || t == "short")    return PlyProperty::Type::INT16;
-		else if (t == "uint16" || t == "ushort")   return PlyProperty::Type::UINT16;
-		else if (t == "int32" || t == "int")      return PlyProperty::Type::INT32;
-		else if (t == "uint32" || t == "uint")     return PlyProperty::Type::UINT32;
+		if (t == "int8" || t == "char")             return PlyProperty::Type::INT8;
+		else if (t == "uint8" || t == "uchar")      return PlyProperty::Type::UINT8;
+		else if (t == "int16" || t == "short")      return PlyProperty::Type::INT16;
+		else if (t == "uint16" || t == "ushort")    return PlyProperty::Type::UINT16;
+		else if (t == "int32" || t == "int")        return PlyProperty::Type::INT32;
+		else if (t == "uint32" || t == "uint")      return PlyProperty::Type::UINT32;
 		else if (t == "float32" || t == "float")    return PlyProperty::Type::FLOAT32;
 		else if (t == "float64" || t == "double")   return PlyProperty::Type::FLOAT64;
 		return PlyProperty::Type::INVALID;
@@ -157,7 +169,7 @@ namespace tinyply
 	template <typename T>
 	inline PlyProperty::Type property_type_for_type(std::vector<T> & theType)
 	{
-		if (std::is_same<T, int8_t>::value)     return PlyProperty::Type::INT8;
+		if (std::is_same<T, int8_t>::value)          return PlyProperty::Type::INT8;
 		else if (std::is_same<T, uint8_t>::value)    return PlyProperty::Type::UINT8;
 		else if (std::is_same<T, int16_t>::value)    return PlyProperty::Type::INT16;
 		else if (std::is_same<T, uint16_t>::value)   return PlyProperty::Type::UINT16;
@@ -170,19 +182,13 @@ namespace tinyply
 
 	class PlyElement
 	{
-
+		void parse_internal(std::istream & is);
 	public:
-
 		PlyElement(std::istream & istream);
 		PlyElement(const std::string & name, size_t count) : name(name), size(count) {}
 		std::string name;
 		size_t size;
 		std::vector<PlyProperty> properties;
-
-	private:
-
-		void parse_internal(std::istream & is);
-
 	};
 
 	inline int find_element(const std::string key, std::vector<PlyElement> & list)

@@ -144,14 +144,14 @@ void PlyFile::read_property_binary(PlyProperty::Type t, void * dest, size_t & de
 
     switch (t)
     {
-        case PlyProperty::Type::INT8:       ply_cast<int8_t>(dest, src.data(), isBigEndian);    break;
-        case PlyProperty::Type::UINT8:      ply_cast<uint8_t>(dest, src.data(), isBigEndian);   break;
-        case PlyProperty::Type::INT16:      ply_cast<int16_t>(dest, src.data(), isBigEndian);   break;
-        case PlyProperty::Type::UINT16:     ply_cast<uint16_t>(dest, src.data(), isBigEndian);  break;
-        case PlyProperty::Type::INT32:      ply_cast<int32_t>(dest, src.data(), isBigEndian);   break;
-        case PlyProperty::Type::UINT32:     ply_cast<uint32_t>(dest, src.data(), isBigEndian);  break;
-        case PlyProperty::Type::FLOAT32:    ply_cast<float>(dest, src.data(), isBigEndian);     break;
-        case PlyProperty::Type::FLOAT64:    ply_cast<double>(dest, src.data(), isBigEndian);    break;
+        case PlyProperty::Type::INT8:       ply_cast<int8_t>(dest, src.data(), isBigEndian);        break;
+        case PlyProperty::Type::UINT8:      ply_cast<uint8_t>(dest, src.data(), isBigEndian);       break;
+        case PlyProperty::Type::INT16:      ply_cast<int16_t>(dest, src.data(), isBigEndian);       break;
+        case PlyProperty::Type::UINT16:     ply_cast<uint16_t>(dest, src.data(), isBigEndian);      break;
+        case PlyProperty::Type::INT32:      ply_cast<int32_t>(dest, src.data(), isBigEndian);       break;
+        case PlyProperty::Type::UINT32:     ply_cast<uint32_t>(dest, src.data(), isBigEndian);      break;
+        case PlyProperty::Type::FLOAT32:    ply_cast_float<float>(dest, src.data(), isBigEndian);   break;
+        case PlyProperty::Type::FLOAT64:    ply_cast_double<double>(dest, src.data(), isBigEndian); break;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
     destOffset += PropertyTable[t].stride;
