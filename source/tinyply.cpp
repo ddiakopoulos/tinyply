@@ -6,6 +6,8 @@
 
 #include "tinyply.h"
 
+#include <set>
+
 using namespace tinyply;
 using namespace std;
 
@@ -365,6 +367,7 @@ void PlyFile::read_internal(std::istream & is)
         skip = [&](const PlyProperty & property, std::istream & is) { skip_property_ascii(property, is); };
     }
     
+    std::set<std::shared_ptr<DataCursor>> processed_cursors;
     for (auto & element : get_elements())
     {
         if (std::find(requestedElements.begin(), requestedElements.end(), element.name) != requestedElements.end())
@@ -412,6 +415,7 @@ void PlyFile::read_internal(std::istream & is)
                         {
                             read(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
                         }
+                        processed_cursors.insert(cursor);
                     }
                     else
                     {
@@ -421,5 +425,11 @@ void PlyFile::read_internal(std::istream & is)
             }
         }
         else continue;
+    }
+
+    // Reset offsets
+    for (auto& c: processed_cursors)
+    {
+        c->offset = 0;
     }
 }
