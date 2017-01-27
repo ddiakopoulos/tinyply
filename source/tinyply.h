@@ -18,6 +18,7 @@
 #include <memory>
 #include <functional>
 #include <cstring>
+#include <stdexcept>
 
 namespace tinyply
 {
