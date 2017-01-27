@@ -30,6 +30,7 @@ if(UNIX)
 endif()
 
 # CMake package config support
+include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 set(config_install_dir "lib/cmake/${PROJECT_NAME}")
