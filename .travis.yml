@@ -1,0 +1,27 @@
+sudo: false
+
+language: cpp
+
+dist: trusty
+
+addons:
+  apt:
+    sources:
+      - george-edison55-precise-backports # cmake 3.2.3
+    packages:
+      - cmake
+      - cmake-data
+
+compiler:
+  - clang
+  - gcc
+
+before_script:
+  - mkdir build
+  - cd build
+  - cmake -DCMAKE_BUILD_TYPE=Debug ..
+
+script:
+  - make VERBOSE=1
+  - ctest -V
+  - make install
