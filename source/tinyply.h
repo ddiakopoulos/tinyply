@@ -280,6 +280,11 @@ namespace tinyply
 		void read(std::istream & is);
 		void write(std::ostream & os, bool isBinary);
 
+		inline bool is_binary() const
+		{
+			return isBinary;
+		}
+
 		std::vector<PlyElement> & get_elements() { return elements; }
 
 		std::vector<std::string> comments;

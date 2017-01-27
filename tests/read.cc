@@ -5,15 +5,16 @@
 
 #include <tinyply.h>
 
-int read_file(const std::string& path, std::ios::openmode mode)
+int read_file(const std::string& path)
 {
 	using namespace tinyply;
 	try
 	{
 		std::cout << "Reading " << path << std::endl;
-		std::ifstream ss(path, mode);
-		PlyFile file(ss);
+		std::ifstream header(path);
+		PlyFile file(header);
 
+		std::cout << "Mode: " << (file.is_binary()? "binary":"ascii") << std::endl;
 		for (const auto& e : file.get_elements())
 		{
 			std::cout << "element - " << e.name << " (" << e.size << ")" << std::endl;
@@ -33,6 +34,12 @@ int read_file(const std::string& path, std::ios::openmode mode)
 
 		uint32_t vertexCount = file.request_properties_from_element("vertex", { "x", "y", "z" }, vertices, 1);
 		uint32_t faceCount = file.request_properties_from_element("face", { "vertex_indices" }, faces, 0);
+
+		// Use different ifstream with proper openmode and position
+		std::ios::openmode mode = file.is_binary()? std::ios::in | std::ios::binary
+                                                          : std::ios::in;
+		std::ifstream ss(path, mode);
+		ss.seekg(header.tellg());
 
 		// Populate the vectors
 		file.read(ss);
@@ -69,7 +76,7 @@ int read_file(const std::string& path, std::ios::openmode mode)
 int main(int argc, char *argv[])
 {
 	int res = 0;
-	res += read_file(ASSETS_DIR "/cube_ascii.ply", std::ios::in);
-	res += read_file(ASSETS_DIR "/icosahedron.ply", std::ios::in | std::ios::binary);
+	res += read_file(ASSETS_DIR "/cube_ascii.ply");
+	res += read_file(ASSETS_DIR "/icosahedron.ply");
 	return res;
 }
