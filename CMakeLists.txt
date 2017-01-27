@@ -12,6 +12,7 @@ include_directories("${CMAKE_SOURCE_DIR}/source")
 
 # Library
 add_library(tinyply source/tinyply.cpp)
+target_include_directories(tinyply SYSTEM PUBLIC ${CMAKE_INSTALL_PREFIX}/include)
 
 # Example
 add_executable(example source/example.cpp)
