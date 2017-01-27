@@ -31,6 +31,7 @@ void PlyProperty::parse_internal(std::istream & is)
         is >> countType >> type;
         listType = property_type_from_string(countType);
         isList = true;
+        listCount = 0;
     }
     propertyType = property_type_from_string(type);
     is >> name;
@@ -391,6 +392,8 @@ void PlyFile::read_internal(std::istream & is)
                             read(property.listType, &listSize, dummyCount, is);
                             if (property.listCount >= 1)
                             {
+                                if (listSize != property.listCount)
+                                    throw std::runtime_error("fixed-length list expected");
                                 if (cursor->realloc == false)
                                 {
                                     cursor->realloc = true;

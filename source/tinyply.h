@@ -376,6 +376,23 @@ namespace tinyply
 			cursor->vector = &source;
 			cursor->data = reinterpret_cast<uint8_t *>(source.data());
 
+			// Update list count for fixed-length lists
+			if (propertyKeys.size() == 1 && listCount > 1)
+			{
+				for (auto& e : get_elements())
+				{
+					if (e.name != elementKey) continue;
+					for (auto& p : e.properties)
+					{
+						if (p.name == propertyKeys[0])
+						{
+							// Update list count of property
+							p.listCount = listCount;
+						}
+					}
+				}
+			};
+
 			if (listCount > 1)
 			{
 				cursor->realloc = true;

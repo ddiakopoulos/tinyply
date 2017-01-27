@@ -5,6 +5,48 @@
 
 #include <tinyply.h>
 
+template <typename T>
+void print_vertices(const T& vertices)
+{
+		for (size_t i = 0; i < vertices.size(); i += 3)
+		{
+			std::cout << "v" << i/3 << ": ["
+								<< vertices[i] << ", " << vertices[i+1] << ", " << vertices[i+2]
+								<< "]" << std::endl;
+		}
+}
+
+template <typename T>
+void print_faces(const T& faces, int /* n */)
+{
+		for (size_t i = 0; i < faces.size(); i++)
+		{
+			std::cout << "f" << i << ": ";
+			for (size_t j = 0; j < faces[i].size(); ++j)
+			{
+				if (j > 0) std::cout << " ";
+				std::cout << faces[i][j];
+			}
+			std::cout << std::endl;
+		}
+}
+
+template <>
+void print_faces<std::vector<uint32_t>>(const std::vector<uint32_t>& faces, int n)
+{
+		for (size_t i = 0; i < faces.size()/n; i++)
+		{
+			std::cout << "f" << i << ": ";
+			for (size_t j = 0; j < n; ++j)
+			{
+				if (j > 0) std::cout << " ";
+				std::cout << faces[i*n + j];
+			}
+			std::cout << std::endl;
+		}
+}
+
+template <typename FaceType, int NVertices>
 int read_file(const std::string& path)
 {
 	using namespace tinyply;
@@ -30,10 +72,10 @@ int read_file(const std::string& path)
 		}
 
 		std::vector<float> vertices;
-		std::vector<std::vector<uint32_t>> faces;
+		std::vector<FaceType> faces;
 
 		uint32_t vertexCount = file.request_properties_from_element("vertex", { "x", "y", "z" }, vertices, 1);
-		uint32_t faceCount = file.request_properties_from_element("face", { "vertex_indices" }, faces, 0);
+		uint32_t faceCount = file.request_properties_from_element("face", { "vertex_indices" }, faces, NVertices);
 
 		// Use different ifstream with proper openmode and position
 		std::ios::openmode mode = file.is_binary()? std::ios::in | std::ios::binary
@@ -44,23 +86,8 @@ int read_file(const std::string& path)
 		// Populate the vectors
 		file.read(ss);
 
-		for (size_t i = 0; i < vertices.size(); i += 3)
-		{
-			std::cout << "v" << i/3 << ": ["
-								<< vertices[i] << ", " << vertices[i+1] << ", " << vertices[i+2]
-								<< "]" << std::endl;
-		}
-
-		for (size_t i = 0; i < faces.size(); i++)
-		{
-			std::cout << "f" << i << ": ";
-			for (size_t j = 0; j < faces[i].size(); ++j)
-			{
-				if (j > 0) std::cout << " ";
-				std::cout << faces[i][j];
-			}
-			std::cout << std::endl;
-		}
+		print_vertices(vertices);
+		print_faces(faces, NVertices);
 
 		std::cout << std::endl;
 
@@ -76,7 +103,8 @@ int read_file(const std::string& path)
 int main(int argc, char *argv[])
 {
 	int res = 0;
-	res += read_file(ASSETS_DIR "/cube_ascii.ply");
-	res += read_file(ASSETS_DIR "/icosahedron.ply");
+	res += read_file<std::vector<uint32_t>, 0>(ASSETS_DIR "/cube_ascii.ply");
+	res += read_file<std::vector<uint32_t>, 0>(ASSETS_DIR "/icosahedron.ply");
+	res += read_file<uint32_t, 4>(ASSETS_DIR "/cube_quad_ascii.ply");
 	return res;
 }
