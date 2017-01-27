@@ -380,7 +380,7 @@ void PlyFile::read_internal(std::istream & is)
                             size_t listSize = 0;
                             size_t dummyCount = 0;
                             read(property.listType, &listSize, dummyCount, is);
-                            if (property.listCount > 1)
+                            if (property.listCount >= 1)
                             {
                                 if (cursor->realloc == false)
                                 {
