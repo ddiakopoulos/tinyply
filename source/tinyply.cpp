@@ -7,6 +7,7 @@
 #include "tinyply.h"
 
 #include <set>
+#include <cassert>
 
 using namespace tinyply;
 using namespace std;
@@ -223,6 +224,7 @@ void PlyFile::write_binary_internal(std::ostream & os)
             for (auto & p : e.properties)
             {
                 auto & cursor = userDataTable[make_key(e.name, p.name)];
+                assert(cursor->data);
                 if (p.isList)
                 {
                     // fixed-length list
@@ -250,6 +252,7 @@ void PlyFile::write_binary_internal(std::ostream & os)
                         memcpy(listSize, &src_size, sizeof(uint32_t));
                         size_t dummyCount = 0;
                         write_property_binary(p.listType, os, listSize, dummyCount);
+                        if (src_size > 0) assert(src_data);
                         for (int j = 0; j < src_size; ++j)
                         {
                             write_property_binary(p.propertyType, os, (src_data + offset), offset);
@@ -279,6 +282,8 @@ void PlyFile::write_ascii_internal(std::ostream & os)
             for (auto & p : e.properties)
             {
                 auto & cursor = userDataTable[make_key(e.name, p.name)];
+                assert(cursor);
+                assert(cursor->data);
                 if (p.isList)
                 {
                     // fixed-length list
@@ -378,6 +383,7 @@ void PlyFile::read_internal(std::istream & is)
                 {
                     if (auto & cursor = userDataTable[make_key(element.name, property.name)])
                     {
+                        assert(cursor->data);
                         if (property.isList)
                         {
                             size_t listSize = 0;
@@ -403,6 +409,7 @@ void PlyFile::read_internal(std::istream & is)
 
                                 // Resize inner vector
                                 resize_vector(property.propertyType, dst_vec, listSize, dst_data);
+                                if (listSize > 0) assert(dst_data);
                                 for (size_t i = 0; i < listSize; ++i)
                                 {
                                     read(property.propertyType, (dst_data + offset), offset, is);
