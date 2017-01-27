@@ -330,17 +330,35 @@ void PlyFile::read_internal(std::istream & is)
                     {
                         if (property.isList)
                         {
-							size_t listSize = 0;
-							size_t dummyCount = 0;
+                            size_t listSize = 0;
+                            size_t dummyCount = 0;
                             read(property.listType, &listSize, dummyCount, is);
-                            if (cursor->realloc == false)
+                            if (property.listCount > 1)
                             {
-                                cursor->realloc = true;
-                                resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
+                                if (cursor->realloc == false)
+                                {
+                                    cursor->realloc = true;
+                                    resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
+                                }
+                                for (size_t i = 0; i < listSize; ++i)
+                                {
+                                    read(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
+                                }
                             }
-                            for (size_t i = 0; i < listSize; ++i)
+                            else // variable-length lists
                             {
-                                read(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
+                                size_t offset = 0;
+                                void* dst_vec = (void*)(&cursor->data[cursor->offset]);
+                                uint8_t* dst_data = nullptr;
+
+                                // Resize inner vector
+                                resize_vector(property.propertyType, dst_vec, listSize, dst_data);
+                                for (size_t i = 0; i < listSize; ++i)
+                                {
+                                    read(property.propertyType, (dst_data + offset), offset, is);
+                                }
+                                // Vector pointer offset
+                                cursor->offset += VectorPropertyTable[property.propertyType].stride;
                             }
                         }
                         else

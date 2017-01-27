@@ -152,7 +152,7 @@ void read_ply_file(const std::string & filename)
 		std::vector<float> norms;
 		std::vector<uint8_t> colors;
 
-		std::vector<uint32_t> faces;
+		std::vector<std::vector<uint32_t>> faces;
 		std::vector<float> uvCoords;
 
 		uint32_t vertexCount, normalCount, colorCount, faceCount, faceTexcoordCount, faceColorCount;

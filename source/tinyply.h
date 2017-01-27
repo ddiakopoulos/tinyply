@@ -130,6 +130,19 @@ namespace tinyply
 		{ PlyProperty::Type::INVALID,{ 0, "INVALID" } }
 	};
 
+	static std::map<PlyProperty::Type, PropertyInfo> VectorPropertyTable
+	{
+		{ PlyProperty::Type::INT8,{ sizeof(std::vector<char>), "char" } },
+		{ PlyProperty::Type::UINT8,{ sizeof(std::vector<unsigned char>), "uchar" } },
+		{ PlyProperty::Type::INT16,{ sizeof(std::vector<short>), "short" } },
+		{ PlyProperty::Type::UINT16,{ sizeof(std::vector<ushort>), "ushort" } },
+		{ PlyProperty::Type::INT32,{ sizeof(std::vector<int>), "int" } },
+		{ PlyProperty::Type::UINT32,{ sizeof(std::vector<uint>), "uint" } },
+		{ PlyProperty::Type::FLOAT32,{ sizeof(std::vector<float>), "float" } },
+		{ PlyProperty::Type::FLOAT64,{ sizeof(std::vector<double>), "double" } },
+		{ PlyProperty::Type::INVALID,{ 0, "INVALID" } }
+	};
+
 	inline PlyProperty::Type property_type_from_string(const std::string & t)
 	{
 		if (t == "int8" || t == "char")             return PlyProperty::Type::INT8;
@@ -168,7 +181,7 @@ namespace tinyply
 	}
 
 	template <typename T>
-	inline PlyProperty::Type property_type_for_type(std::vector<T> & theType)
+	inline PlyProperty::Type property_type_for_type(typename std::enable_if<std::is_arithmetic<T>::value>::type* = 0)
 	{
 		if (std::is_same<T, int8_t>::value)          return PlyProperty::Type::INT8;
 		else if (std::is_same<T, uint8_t>::value)    return PlyProperty::Type::UINT8;
@@ -179,6 +192,12 @@ namespace tinyply
 		else if (std::is_same<T, float>::value)      return PlyProperty::Type::FLOAT32;
 		else if (std::is_same<T, double>::value)     return PlyProperty::Type::FLOAT64;
 		else return PlyProperty::Type::INVALID;
+	}
+
+	template <typename T>
+	inline PlyProperty::Type property_type_for_type(typename std::enable_if<!std::is_arithmetic<T>::value>::type* = 0)
+	{
+		return property_type_for_type<typename T::value_type>();
 	}
 
 	class PlyElement
@@ -243,7 +262,7 @@ namespace tinyply
 					{
 						if (p.name == propertyKey)
 						{
-							if (PropertyTable[property_type_for_type(source)].stride != PropertyTable[p.propertyType].stride)
+							if (PropertyTable[property_type_for_type<T>()].stride != PropertyTable[p.propertyType].stride)
 								throw std::runtime_error("destination vector is wrongly typed to hold this property");
 							return e.size;
 
@@ -298,7 +317,9 @@ namespace tinyply
 				else continue;
 			}
 
-			size_t totalInstanceSize = [&]() { size_t t = 0; for (auto c : instanceCounts) { t += c; } return t; }() * listCount;
+			size_t totalInstanceSize = [&]() { size_t t = 0; for (auto c : instanceCounts) { t += c; } return t; }();
+			if (listCount >= 1)
+				totalInstanceSize *= listCount;
 			source.resize(totalInstanceSize); // this satisfies regular properties; `cursor->realloc` is for list types since tinyply uses single-pass parsing
 			cursor->offset = 0;
 			cursor->vector = &source;
@@ -325,7 +346,7 @@ namespace tinyply
 			{
 				for (auto key : propertyKeys)
 				{
-					PlyProperty::Type t = property_type_for_type(source);
+					PlyProperty::Type t = property_type_for_type<T>();
 					PlyProperty newProp = (listType == PlyProperty::Type::INVALID) ? PlyProperty(t, key) : PlyProperty(listType, t, key, listCount);
 					userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(make_key(e.name, key), cursor));
 					e.properties.push_back(newProp);
