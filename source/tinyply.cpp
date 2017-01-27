@@ -192,7 +192,6 @@ void PlyFile::write_property_ascii(PlyProperty::Type t, std::ostream & os, uint8
         case PlyProperty::Type::FLOAT64:    os << *reinterpret_cast<double*>(src);      break;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
-    os << " ";
     srcOffset += PropertyTable[t].stride;
 }
 
@@ -280,19 +279,22 @@ void PlyFile::write_ascii_internal(std::ostream & os)
     {
         for (size_t i = 0; i < e.size; ++i)
         {
+            size_t idx = 0;
             for (auto & p : e.properties)
             {
                 auto & cursor = userDataTable[make_key(e.name, p.name)];
                 assert(cursor);
                 assert(cursor->data);
+                if (idx++ > 0) os << " ";
                 if (p.isList)
                 {
                     // fixed-length list
                     if (p.listCount >= 1)
                     {
-                        os << p.listCount << " ";
+                        os << p.listCount;
                         for (int j = 0; j < p.listCount; ++j)
                         {
+                            os << " ";
                             write_property_ascii(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
                         }
                     }
@@ -305,9 +307,10 @@ void PlyFile::write_ascii_internal(std::ostream & os)
                         size_t src_size = 0;
                         get_size(p.propertyType, src_vec, src_size);
 
-                        os << src_size << " ";
+                        os << src_size;
                         for (int j = 0; j < src_size; ++j)
                         {
+                            os << " ";
                             write_property_ascii(p.propertyType, os, (src_data + offset), offset);
                         }
 
