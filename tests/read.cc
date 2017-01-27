@@ -47,7 +47,7 @@ void print_faces<std::vector<uint32_t>>(const std::vector<uint32_t>& faces, int 
 }
 
 template <typename FaceType, int NVertices>
-int read_file(const std::string& path)
+int read_file(const std::string& path, bool read_vertices = true, bool read_faces = true)
 {
 	using namespace tinyply;
 	try
@@ -74,8 +74,10 @@ int read_file(const std::string& path)
 		std::vector<float> vertices;
 		std::vector<FaceType> faces;
 
-		uint32_t vertexCount = file.request_properties_from_element("vertex", { "x", "y", "z" }, vertices, 1);
-		uint32_t faceCount = file.request_properties_from_element("face", { "vertex_indices" }, faces, NVertices);
+		if (read_vertices)
+			file.request_properties_from_element("vertex", { "x", "y", "z" }, vertices, 1);
+		if (read_faces)
+			file.request_properties_from_element("face", { "vertex_indices" }, faces, NVertices);
 
 		// Use different ifstream with proper openmode and position
 		std::ios::openmode mode = file.is_binary()? std::ios::in | std::ios::binary
@@ -103,8 +105,14 @@ int read_file(const std::string& path)
 int main(int argc, char *argv[])
 {
 	int res = 0;
-	res += read_file<std::vector<uint32_t>, 0>(ASSETS_DIR "/cube_ascii.ply");
-	res += read_file<std::vector<uint32_t>, 0>(ASSETS_DIR "/icosahedron.ply");
-	res += read_file<uint32_t, 4>(ASSETS_DIR "/cube_quad_ascii.ply");
+	res += read_file<std::vector<uint32_t>, 0>(ASSETS_DIR "/cube_ascii.ply", true, true);
+	res += read_file<std::vector<uint32_t>, 0>(ASSETS_DIR "/cube_ascii.ply", true, false);
+	res += read_file<std::vector<uint32_t>, 0>(ASSETS_DIR "/cube_ascii.ply", false, true);
+	res += read_file<std::vector<uint32_t>, 0>(ASSETS_DIR "/icosahedron.ply", true, true);
+	res += read_file<std::vector<uint32_t>, 0>(ASSETS_DIR "/icosahedron.ply", true, false);
+	res += read_file<std::vector<uint32_t>, 0>(ASSETS_DIR "/icosahedron.ply", false, true);
+	res += read_file<uint32_t, 4>(ASSETS_DIR "/cube_quad_ascii.ply", true, true);
+	res += read_file<uint32_t, 4>(ASSETS_DIR "/cube_quad_ascii.ply", true, false);
+	res += read_file<uint32_t, 4>(ASSETS_DIR "/cube_quad_ascii.ply", false, true);
 	return res;
 }

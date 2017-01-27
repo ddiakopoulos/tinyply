@@ -375,7 +375,17 @@ void PlyFile::read_internal(std::istream & is)
         read = [&](PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is) { read_property_ascii(t, dest, destOffset, is); };
         skip = [&](const PlyProperty & property, std::istream & is) { skip_property_ascii(property, is); };
     }
-    
+
+    auto skip_element = [&](const PlyElement & element, std::istream & is) {
+        for (size_t count = 0; count < element.size; ++count)
+        {
+            for (auto& property : element.properties)
+            {
+              skip(property, is);
+            }
+        }
+    };
+
     std::set<std::shared_ptr<DataCursor>> processed_cursors;
     for (auto & element : get_elements())
     {
@@ -437,7 +447,10 @@ void PlyFile::read_internal(std::istream & is)
                 }
             }
         }
-        else continue;
+        else
+        {
+            skip_element(element, is);
+        }
     }
 
     // Reset offsets
