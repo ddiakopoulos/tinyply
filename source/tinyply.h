@@ -180,6 +180,52 @@ namespace tinyply
 		}
 	}
 
+	template<typename T>
+	inline uint8_t * get_data(void * v)
+	{
+		auto vec = static_cast<std::vector<T> *>(v);
+		return reinterpret_cast<uint8_t *>(vec->data());
+	}
+
+	inline void get_data(const PlyProperty::Type t, void * v, uint8_t *& ptr)
+	{
+		switch (t)
+		{
+		case PlyProperty::Type::INT8:       ptr = get_data<int8_t>(v);   break;
+		case PlyProperty::Type::UINT8:      ptr = get_data<uint8_t>(v);  break;
+		case PlyProperty::Type::INT16:      ptr = get_data<int16_t>(v);  break;
+		case PlyProperty::Type::UINT16:     ptr = get_data<uint16_t>(v); break;
+		case PlyProperty::Type::INT32:      ptr = get_data<int32_t>(v);  break;
+		case PlyProperty::Type::UINT32:     ptr = get_data<uint32_t>(v); break;
+		case PlyProperty::Type::FLOAT32:    ptr = get_data<float>(v);    break;
+		case PlyProperty::Type::FLOAT64:    ptr = get_data<double>(v);   break;
+		case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
+		}
+	}
+
+	template<typename T>
+	inline size_t get_size(void * v)
+	{
+		auto vec = static_cast<std::vector<T> *>(v);
+		return vec->size();
+	}
+
+	inline void get_size(const PlyProperty::Type t, void * v, size_t& s)
+	{
+		switch (t)
+		{
+		case PlyProperty::Type::INT8:       s = get_size<int8_t>(v);   break;
+		case PlyProperty::Type::UINT8:      s = get_size<uint8_t>(v);  break;
+		case PlyProperty::Type::INT16:      s = get_size<int16_t>(v);  break;
+		case PlyProperty::Type::UINT16:     s = get_size<uint16_t>(v); break;
+		case PlyProperty::Type::INT32:      s = get_size<int32_t>(v);  break;
+		case PlyProperty::Type::UINT32:     s = get_size<uint32_t>(v); break;
+		case PlyProperty::Type::FLOAT32:    s = get_size<float>(v);    break;
+		case PlyProperty::Type::FLOAT64:    s = get_size<double>(v);   break;
+		case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
+		}
+	}
+
 	template <typename T>
 	inline PlyProperty::Type property_type_for_type(typename std::enable_if<std::is_arithmetic<T>::value>::type* = 0)
 	{
@@ -361,7 +407,15 @@ namespace tinyply
 			}
 			else
 			{
-				PlyElement newElement = (listCount == 1) ? PlyElement(elementKey, source.size() / propertyKeys.size()) : PlyElement(elementKey, source.size() / listCount);
+				PlyElement newElement =
+					(listCount == 1) // single value
+						? PlyElement(
+								elementKey,
+								source.size() / propertyKeys.size())
+						: ((listCount > 1) // fixed-length list
+								? PlyElement(elementKey,
+														 source.size() / listCount)
+								: PlyElement(elementKey, source.size())); // variable-length list
 				create_property_on_element(newElement);
 				elements.push_back(newElement);
 			}

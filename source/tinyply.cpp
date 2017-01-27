@@ -223,13 +223,38 @@ void PlyFile::write_binary_internal(std::ostream & os)
                 auto & cursor = userDataTable[make_key(e.name, p.name)];
                 if (p.isList)
                 {
-                    uint8_t listSize[4] = {0, 0, 0, 0};
-                    memcpy(listSize, &p.listCount, sizeof(uint32_t));
-					size_t dummyCount = 0;
-                    write_property_binary(p.listType, os, listSize, dummyCount);
-                    for (int j = 0; j < p.listCount; ++j)
+                    // fixed-length list
+                    if (p.listCount >= 1)
                     {
-                        write_property_binary(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
+                        uint8_t listSize[4] = {0, 0, 0, 0};
+                        memcpy(listSize, &p.listCount, sizeof(uint32_t));
+                        size_t dummyCount = 0;
+                        write_property_binary(p.listType, os, listSize, dummyCount);
+                        for (int j = 0; j < p.listCount; ++j)
+                        {
+                            write_property_binary(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
+                        }
+                    }
+                    else // variable-length list
+                    {
+                        size_t offset = 0;
+                        void* src_vec = (void*)(&cursor->data[cursor->offset]);
+                        uint8_t* src_data = nullptr;
+                        get_data(p.propertyType, src_vec, src_data);
+                        size_t src_size = 0;
+                        get_size(p.propertyType, src_vec, src_size);
+
+                        uint8_t listSize[4] = {0, 0, 0, 0};
+                        memcpy(listSize, &src_size, sizeof(uint32_t));
+                        size_t dummyCount = 0;
+                        write_property_binary(p.listType, os, listSize, dummyCount);
+                        for (int j = 0; j < src_size; ++j)
+                        {
+                            write_property_binary(p.propertyType, os, (src_data + offset), offset);
+                        }
+
+                        // Vector pointer offset
+                        cursor->offset += VectorPropertyTable[p.propertyType].stride;
                     }
                 }
                 else
@@ -254,10 +279,32 @@ void PlyFile::write_ascii_internal(std::ostream & os)
                 auto & cursor = userDataTable[make_key(e.name, p.name)];
                 if (p.isList)
                 {
-                    os << p.listCount << " ";
-                    for (int j = 0; j < p.listCount; ++j)
+                    // fixed-length list
+                    if (p.listCount >= 1)
                     {
-                        write_property_ascii(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
+                        os << p.listCount << " ";
+                        for (int j = 0; j < p.listCount; ++j)
+                        {
+                            write_property_ascii(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
+                        }
+                    }
+                    else // variable-length list
+                    {
+                        size_t offset = 0;
+                        void* src_vec = (void*)(&cursor->data[cursor->offset]);
+                        uint8_t* src_data = nullptr;
+                        get_data(p.propertyType, src_vec, src_data);
+                        size_t src_size = 0;
+                        get_size(p.propertyType, src_vec, src_size);
+
+                        os << src_size << " ";
+                        for (int j = 0; j < src_size; ++j)
+                        {
+                            write_property_ascii(p.propertyType, os, (src_data + offset), offset);
+                        }
+
+                        // Vector pointer offset
+                        cursor->offset += VectorPropertyTable[p.propertyType].stride;
                     }
                 }
                 else
