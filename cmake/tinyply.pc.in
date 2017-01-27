@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: tinyply
+Description: C++11 ply 3d mesh format importer & exporter
+Version: @PROJECT_VERSION@
+
+Cflags: -I${includedir}
+Libs: -L${libdir} -ltinyply
