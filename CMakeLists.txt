@@ -17,6 +17,10 @@ add_library(tinyply source/tinyply.cpp)
 add_executable(example source/example.cpp)
 target_link_libraries(example PRIVATE tinyply)
 
+# Tests
+enable_testing()
+add_subdirectory(tests)
+
 # pkg-config support
 set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
 if(UNIX)
