@@ -246,6 +246,18 @@ namespace tinyply
 		return property_type_for_type<typename T::value_type>();
 	}
 
+	template <typename T>
+	inline bool is_vector_type(typename std::enable_if<!std::is_arithmetic<T>::value>::type* = 0)
+	{
+		return true;
+	}
+
+	template <typename T>
+	inline bool is_vector_type(typename std::enable_if<std::is_arithmetic<T>::value>::type* = 0)
+	{
+		return false;
+	}
+
 	class PlyElement
 	{
 		void parse_internal(std::istream & is);
@@ -291,7 +303,7 @@ namespace tinyply
 		std::vector<std::string> objInfo;
 
 		template<typename T>
-		size_t request_properties_from_element(const std::string & elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source, const int listCount = 1)
+		size_t request_properties_from_element(const std::string & elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source, int listCount = 1)
 		{
 			if (get_elements().size() == 0)
 				return 0;
@@ -302,6 +314,10 @@ namespace tinyply
 					requestedElements.push_back(elementKey);
 			}
 			else return 0;
+
+			// If a vector<vector<...>> is provided, override listCount
+			if (is_vector_type<T>())
+				listCount = 0;
 
 			// count and verify large enough
 			auto instance_counter = [&](const std::string & elementKey, const std::string & propertyKey)
