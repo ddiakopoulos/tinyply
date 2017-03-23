@@ -66,7 +66,6 @@ PlyFile::PlyFile(std::istream & is)
 bool PlyFile::parse_header(std::istream & is)
 {
     std::string line;
-    bool gotMagic = false;
     while (std::getline(is, line))
     {
         std::istringstream ls(line);
@@ -74,7 +73,6 @@ bool PlyFile::parse_header(std::istream & is)
         ls >> token;
         if (token == "ply" || token == "PLY" || token == "")
         {
-            gotMagic = true;
             continue;
         }
         else if (token == "comment")    read_header_text(line, ls, comments, 8);
