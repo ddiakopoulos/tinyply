@@ -1,6 +1,7 @@
 // This software is in the public domain. Where that dedication is not
 // recognized, you are granted a perpetual, irrevocable license to copy,
 // distribute, and modify this file as you see fit.
+
 // Authored in 2015 by Dimitri Diakopoulos (http://www.dimitridiakopoulos.com)
 // https://github.com/ddiakopoulos/tinyply
 
@@ -23,9 +24,9 @@ inline std::chrono::time_point<std::chrono::high_resolution_clock> now()
 	return c.now();
 }
 
-inline double difference_micros(timepoint start, timepoint end)
+inline double difference_millis(timepoint start, timepoint end)
 {
-	return (double)std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+	return (double)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 }
 
 void write_ply_example(const std::string & filename)
@@ -127,6 +128,11 @@ void read_ply_file(const std::string & filename)
 		// for the lib -- tinyply does not perform any file i/o.
 		std::ifstream ss(filename, std::ios::binary);
 
+        if (ss.fail()) 
+        {
+            std::cout << "Failed to open " << filename << std::endl;
+        }
+
 		// Parse the ASCII header fields
 		PlyFile file(ss);
 
@@ -178,7 +184,7 @@ void read_ply_file(const std::string & filename)
 		timepoint after = now();
 
 		// Good place to put a breakpoint!
-		std::cout << "Parsing took " << difference_micros(before, after) << "μs: " << std::endl;
+		std::cout << "Parsing took " << difference_millis(before, after) << " ms: " << std::endl;
 		std::cout << "\tRead " << verts.size() << " total vertices (" << vertexCount << " properties)." << std::endl;
 		std::cout << "\tRead " << norms.size() << " total normals (" << normalCount << " properties)." << std::endl;
 		std::cout << "\tRead " << colors.size() << " total vertex colors (" << colorCount << " properties)." << std::endl;
@@ -214,7 +220,7 @@ void read_ply_file(const std::string & filename)
 
 int main(int argc, char *argv[])
 {
-	write_ply_example("example_tetrahedron.ply");
-	read_ply_file("example_tetrahedron.ply");
+	//write_ply_example("example_tetrahedron.ply");
+	read_ply_file("../assets/dragon_vrip.ply");
 	return 0;
 }
