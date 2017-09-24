@@ -29,6 +29,7 @@ inline double difference_millis(timepoint start, timepoint end)
 	return (double)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 }
 
+/*
 void write_ply_example(const std::string & filename)
 {
 	std::vector<float> verts;
@@ -118,6 +119,7 @@ void write_ply_example(const std::string & filename)
 
 	fb.close();
 }
+*/
 
 void read_ply_file(const std::string & filename)
 {
@@ -167,29 +169,30 @@ void read_ply_file(const std::string & filename)
 		// The count returns the number of instances of the property group. The vectors
 		// above will be resized into a multiple of the property group size as
 		// they are "flattened"... i.e. verts = {x, y, z, x, y, z, ...}
-		vertexCount = file.request_properties_from_element("vertex", { "x", "y", "z" }, verts);
-		normalCount = file.request_properties_from_element("vertex", { "nx", "ny", "nz" }, norms);
-		colorCount = file.request_properties_from_element("vertex", { "red", "green", "blue", "alpha" }, colors);
+		vertexCount = file.request_properties_from_element("vertex", { "x", "y", "z" });
+		normalCount = file.request_properties_from_element("vertex", { "nx", "ny", "nz" });
+		//colorCount = file.request_properties_from_element("vertex", { "red", "green", "blue", "alpha" });
 
 		// For properties that are list types, it is possibly to specify the expected count (ideal if a
 		// consumer of this library knows the layout of their format a-priori). Otherwise, tinyply
 		// defers allocation of memory until the first instance of the property has been found
 		// as implemented in file.read(ss)
-		faceCount = file.request_properties_from_element("face", { "vertex_indices" }, faces, 3);
-		faceTexcoordCount = file.request_properties_from_element("face", { "texcoord" }, uvCoords, 6);
+		faceCount = file.request_properties_from_element("face", { "vertex_indices" });
+		//faceTexcoordCount = file.request_properties_from_element("face", { "texcoord" });
 
 		// Now populate the vectors...
 		timepoint before = now();
-		file.read(ss);
+		file.read();
 		timepoint after = now();
 
 		// Good place to put a breakpoint!
 		std::cout << "Parsing took " << difference_millis(before, after) << " ms: " << std::endl;
 		std::cout << "\tRead " << verts.size() << " total vertices (" << vertexCount << " properties)." << std::endl;
-		std::cout << "\tRead " << norms.size() << " total normals (" << normalCount << " properties)." << std::endl;
-		std::cout << "\tRead " << colors.size() << " total vertex colors (" << colorCount << " properties)." << std::endl;
-		std::cout << "\tRead " << faces.size() << " total faces (triangles) (" << faceCount << " properties)." << std::endl;
-		std::cout << "\tRead " << uvCoords.size() << " total texcoords (" << faceTexcoordCount << " properties)." << std::endl;
+
+		//std::cout << "\tRead " << norms.size() << " total normals (" << normalCount << " properties)." << std::endl;
+		//std::cout << "\tRead " << colors.size() << " total vertex colors (" << colorCount << " properties)." << std::endl;
+		//std::cout << "\tRead " << faces.size() << " total faces (triangles) (" << faceCount << " properties)." << std::endl;
+		//std::cout << "\tRead " << uvCoords.size() << " total texcoords (" << faceTexcoordCount << " properties)." << std::endl;
 		
 		/*
 		// Fixme - tinyply isn't particularly sensitive to mismatched properties and prefers to crash instead of throw. Use
@@ -221,6 +224,6 @@ void read_ply_file(const std::string & filename)
 int main(int argc, char *argv[])
 {
 	//write_ply_example("example_tetrahedron.ply");
-	read_ply_file("../assets/dragon_vrip.ply");
+	read_ply_file("../assets/icosahedron.ply");
 	return 0;
 }

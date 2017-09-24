@@ -44,11 +44,15 @@ namespace tinyply
 
 	struct DataCursor
 	{
-		void * vector;
-		uint8_t * data;
+		uint8_t * data; // std shared_ptr to std::vector
 		size_t offset;
-		bool realloc = false;
+        size_t size;
 	};
+
+    inline std::string make_key(const std::string & a, const std::string & b)
+    {
+        return (a + "-" + b);
+    }
 
 	class PlyProperty
 	{
@@ -77,11 +81,6 @@ namespace tinyply
 		std::string name;
 		int listCount = 0;
 	};
-
-	inline std::string make_key(const std::string & a, const std::string & b)
-	{
-		return (a + "-" + b);
-	}
 
 	template<typename T>
 	void ply_cast(void * dest, const char * src, bool be)
@@ -142,44 +141,6 @@ namespace tinyply
 		return PlyProperty::Type::INVALID;
 	}
 
-	template<typename T>
-	inline uint8_t * resize(void * v, size_t newSize)
-	{
-		auto vec = static_cast<std::vector<T> *>(v);
-		vec->resize(newSize);
-		return reinterpret_cast<uint8_t *>(vec->data());
-	}
-
-	inline void resize_vector(const PlyProperty::Type t, void * v, size_t newSize, uint8_t *& ptr)
-	{
-		switch (t)
-		{
-		case PlyProperty::Type::INT8:       ptr = resize<int8_t>(v, newSize);   break;
-		case PlyProperty::Type::UINT8:      ptr = resize<uint8_t>(v, newSize);  break;
-		case PlyProperty::Type::INT16:      ptr = resize<int16_t>(v, newSize);  break;
-		case PlyProperty::Type::UINT16:     ptr = resize<uint16_t>(v, newSize); break;
-		case PlyProperty::Type::INT32:      ptr = resize<int32_t>(v, newSize);  break;
-		case PlyProperty::Type::UINT32:     ptr = resize<uint32_t>(v, newSize); break;
-		case PlyProperty::Type::FLOAT32:    ptr = resize<float>(v, newSize);    break;
-		case PlyProperty::Type::FLOAT64:    ptr = resize<double>(v, newSize);   break;
-		case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
-		}
-	}
-
-	template <typename T>
-	inline PlyProperty::Type property_type_for_type(std::vector<T> & theType)
-	{
-		if (std::is_same<T, int8_t>::value)          return PlyProperty::Type::INT8;
-		else if (std::is_same<T, uint8_t>::value)    return PlyProperty::Type::UINT8;
-		else if (std::is_same<T, int16_t>::value)    return PlyProperty::Type::INT16;
-		else if (std::is_same<T, uint16_t>::value)   return PlyProperty::Type::UINT16;
-		else if (std::is_same<T, int32_t>::value)    return PlyProperty::Type::INT32;
-		else if (std::is_same<T, uint32_t>::value)   return PlyProperty::Type::UINT32;
-		else if (std::is_same<T, float>::value)      return PlyProperty::Type::FLOAT32;
-		else if (std::is_same<T, double>::value)     return PlyProperty::Type::FLOAT64;
-		else return PlyProperty::Type::INVALID;
-	}
-
 	class PlyElement
 	{
 		void parse_internal(std::istream & is);
@@ -191,27 +152,28 @@ namespace tinyply
 		std::vector<PlyProperty> properties;
 	};
 
-	inline int find_element(const std::string key, std::vector<PlyElement> & list)
+	inline int find_element(const std::string & key, const std::vector<PlyElement> & list)
 	{
-		for (size_t i = 0; i < list.size(); ++i)
-		{
-			if (list[i].name == key)
-			{
-				return i;
-			}
-		}
+        for (size_t i = 0; i < list.size(); i++) if (list[i].name == key) return i;
 		return -1;
 	}
+
+    inline int find_property(const std::string & key, const std::vector<PlyProperty> & list)
+    {
+        for (size_t i = 0; i < list.size(); ++i) if (list[i].name == key) return i;
+        return -1;
+    }
 
 	class PlyFile
 	{
 
+        std::istream & is;
+
 	public:
 
-		PlyFile() {}
 		PlyFile(std::istream & is);
 
-		void read(std::istream & is);
+		void read();
 		void write(std::ostream & os, bool isBinary);
 
 		std::vector<PlyElement> & get_elements() { return elements; }
@@ -219,99 +181,68 @@ namespace tinyply
 		std::vector<std::string> comments;
 		std::vector<std::string> objInfo;
 
-		template<typename T>
-		size_t request_properties_from_element(const std::string & elementKey, std::vector<std::string> propertyKeys, std::vector<T> & source, const int listCount = 1)
+        // Returns the size (in bytes)
+		size_t request_properties_from_element(const std::string & elementKey, std::vector<std::string> propertyKeys)
 		{
-			if (get_elements().size() == 0)
-				return 0;
+			if (get_elements().size() == 0) return 0;
+            if (!propertyKeys.size()) return 0;
 
-			if (find_element(elementKey, get_elements()) >= 0)
+            const int elementIndex = find_element(elementKey, get_elements());
+
+            // Sanity check if the user requested element is in the pre-parsed header
+			if (elementIndex >= 0)
 			{
-				if (std::find(requestedElements.begin(), requestedElements.end(), elementKey) == requestedElements.end())
-					requestedElements.push_back(elementKey);
+                std::cout << "looking for: " << elementKey << std::endl;
+                std::cout << "Index of element is: " << elementIndex << std::endl;
+
+                // We found the element
+                const PlyElement & element = get_elements()[elementIndex];
+
+                // Find each of the keys
+                for (auto key : propertyKeys)
+                {
+                    const int propertyIndex = find_property(key, element.properties);
+
+                    if (propertyIndex >= 0)
+                    {
+                        // We found the property
+                        const PlyProperty & property = element.properties[propertyIndex];
+
+                        // All requested properties in the userDataTable share the same cursor (thrown into the same flat array)
+                        std::shared_ptr<DataCursor> cursor = std::make_shared<DataCursor>();
+                        cursor->offset = 0;
+                        cursor->size = 0;
+
+                        auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(make_key(element.name, property.name), cursor));
+                        if (result.second == false)
+                        {
+                            //throw std::invalid_argument("property has already been requested");
+                        }
+                    }
+                }
 			}
 			else return 0;
 
-			// count and verify large enough
-			auto instance_counter = [&](const std::string & _elementKey, const std::string & propertyKey)
-			{
-				for (auto e : get_elements())
-				{
-					if (e.name != _elementKey) continue;
-					for (auto p : e.properties)
-					{
-						if (p.name == propertyKey)
-						{
-							if (PropertyTable[property_type_for_type(source)].stride != PropertyTable[p.propertyType].stride)
-								throw std::runtime_error("destination vector is wrongly typed to hold this property");
-							return e.size;
 
-						}
-					}
-				}
-				return size_t(0);
-			};
+            for (auto & cursor : userDataTable)
+            {
+                std::cout << "Cursor Key: " << cursor.first << std::endl;
+            }
+            std::cout << "-----" << std::endl;
 
-			// Check if requested key is in the parsed header
-			std::vector<std::string> unusedKeys;
-			for (auto key : propertyKeys)
-			{
-				for (auto e : get_elements())
-				{
-					if (e.name != elementKey) continue;
-					std::vector<std::string> headerKeys;
-					for (auto p : e.properties)
-					{
-						headerKeys.push_back(p.name);
-					}
+            return 0;
 
-					if (std::find(headerKeys.begin(), headerKeys.end(), key) == headerKeys.end())
-					{
-						unusedKeys.push_back(key);
-					}
-
-				}
-			}
-
-			// Not using them? Don't let them affect the propertyKeys count used for calculating array sizes
-			for (auto k : unusedKeys)
-			{
-				propertyKeys.erase(std::remove(propertyKeys.begin(), propertyKeys.end(), k), propertyKeys.end());
-			}
-			if (!propertyKeys.size()) return 0;
-
-			// All requested properties in the userDataTable share the same cursor (thrown into the same flat array)
-			auto cursor = std::make_shared<DataCursor>();
-
-			std::vector<size_t> instanceCounts;
-
-			for (auto key : propertyKeys)
-			{
-				if (int instanceCount = instance_counter(elementKey, key))
-				{
-					instanceCounts.push_back(instanceCount);
-					auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(make_key(elementKey, key), cursor));
-					if (result.second == false)
-						throw std::invalid_argument("property has already been requested: " + key);
-				}
-				else continue;
-			}
-
-			size_t totalInstanceSize = [&]() { size_t t = 0; for (auto c : instanceCounts) { t += c; } return t; }() * listCount;
-			source.resize(totalInstanceSize); // this satisfies regular properties; `cursor->realloc` is for list types since tinyply uses single-pass parsing
-			cursor->offset = 0;
-			cursor->vector = &source;
-			cursor->data = reinterpret_cast<uint8_t *>(source.data());
-
+            /*
 			if (listCount > 1)
 			{
-				cursor->realloc = true;
 				return (totalInstanceSize / propertyKeys.size()) / listCount;
 			}
+            */
 
-			return totalInstanceSize / propertyKeys.size();
+			//return totalInstanceSize / propertyKeys.size();
 		}
 
+        /*
 		template<typename T>
 		void add_properties_to_element(const std::string & elementKey, const std::vector<std::string> & propertyKeys, std::vector<T> & source, const int listCount = 1, const PlyProperty::Type listType = PlyProperty::Type::INVALID)
 		{
@@ -344,14 +275,15 @@ namespace tinyply
 				elements.push_back(newElement);
 			}
 		}
+        */
 
 	private:
 
 		size_t skip_property_binary(const PlyProperty & property, std::istream & is);
-		void skip_property_ascii(const PlyProperty & property, std::istream & is);
+		size_t skip_property_ascii(const PlyProperty & property, std::istream & is);
 
-		void read_property_binary(PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is);
-		void read_property_ascii(PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is);
+		size_t read_property_binary(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is);
+        size_t read_property_ascii(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is);
 		void write_property_ascii(PlyProperty::Type t, std::ostream & os, uint8_t * src, size_t & srcOffset);
 		void write_property_binary(PlyProperty::Type t, std::ostream & os, uint8_t * src, size_t & srcOffset);
 
@@ -363,7 +295,7 @@ namespace tinyply
 		void read_header_property(std::istream & is);
 		void read_header_text(std::string line, std::istream & is, std::vector<std::string> & place, int erase = 0);
 
-		void read_internal(std::istream & is);
+		void read_internal(bool firstPass = false);
 
 		void write_ascii_internal(std::ostream & os);
 		void write_binary_internal(std::ostream & os);
@@ -374,7 +306,6 @@ namespace tinyply
 		std::map<std::string, std::shared_ptr<DataCursor>> userDataTable;
 
 		std::vector<PlyElement> elements;
-		std::vector<std::string> requestedElements;
 	};
 
 } // namesapce tinyply

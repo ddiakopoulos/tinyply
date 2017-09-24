@@ -51,7 +51,7 @@ void PlyElement::parse_internal(std::istream & is)
 // PLY File //
 //////////////
 
-PlyFile::PlyFile(std::istream & is)
+PlyFile::PlyFile(std::istream & is) : is(is)
 {
     if (!parse_header(is))
     {
@@ -105,38 +105,51 @@ void PlyFile::read_header_property(std::istream & is)
     get_elements().back().properties.emplace_back(is);
 }
 
-size_t PlyFile::skip_property_binary(const PlyProperty & property, std::istream & is)
+size_t PlyFile::skip_property_binary(const PlyProperty & p, std::istream & is)
 {
-    static std::vector<char> skip(PropertyTable[property.propertyType].stride);
-    if (property.isList)
+    static std::vector<char> skip(PropertyTable[p.propertyType].stride);
+    if (p.isList)
     {
 		size_t listSize = 0;
 		size_t dummyCount = 0;
-        read_property_binary(property.listType, &listSize, dummyCount, is);
-        for (size_t i = 0; i < listSize; ++i) is.read(skip.data(), PropertyTable[property.propertyType].stride);
-        return listSize;
+        read_property_binary(p, &listSize, dummyCount, is);
+        for (size_t i = 0; i < listSize; ++i) is.read(skip.data(), PropertyTable[p.propertyType].stride);
+        std::cout << "Skipping with list size: " << listSize << std::endl;
+        return listSize * PropertyTable[p.propertyType].stride; // in bytes
     }
     else
     {
-        is.read(skip.data(), PropertyTable[property.propertyType].stride);
-        return 0;
+        is.read(skip.data(), PropertyTable[p.propertyType].stride);
+        return PropertyTable[p.propertyType].stride;
     }
 }
 
-void PlyFile::skip_property_ascii(const PlyProperty & property, std::istream & is)
+size_t PlyFile::skip_property_ascii(const PlyProperty & p, std::istream & is)
 {
+    const PlyProperty::Type t = (p.isList) ? p.listType : p.propertyType;
+
     std::string skip;
-    if (property.isList)
+    if (p.isList)
     {
-        int listSize;
-        is >> listSize;
-        for (int i = 0; i < listSize; ++i) is >> skip;
+        size_t listSize = 0;
+        size_t dummyCount = 0;
+        read_property_ascii(p, &listSize, dummyCount, is);
+        for (size_t i = 0; i < listSize; ++i) is >> skip;
+        return listSize * PropertyTable[t].stride; // in bytes
     }
-    else is >> skip;
+    else
+    {
+        is >> skip;
+        return PropertyTable[t].stride;
+    }
 }
 
-void PlyFile::read_property_binary(PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is)
+size_t PlyFile::read_property_binary(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is)
 {
+    const PlyProperty::Type t = (p.isList) ? p.listType : p.propertyType;
+
+    destOffset += PropertyTable[t].stride;
+
     static std::vector<char> src(PropertyTable[t].stride);
     is.read(src.data(), PropertyTable[t].stride);
 
@@ -152,11 +165,15 @@ void PlyFile::read_property_binary(PlyProperty::Type t, void * dest, size_t & de
         case PlyProperty::Type::FLOAT64:    ply_cast_double<double>(dest, src.data(), isBigEndian); break;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
-    destOffset += PropertyTable[t].stride;
+    return PropertyTable[t].stride;
 }
 
-void PlyFile::read_property_ascii(PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is)
+size_t PlyFile::read_property_ascii(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is)
 {
+    const PlyProperty::Type t = (p.isList) ? p.listType : p.propertyType;
+
+    destOffset += PropertyTable[t].stride;
+
     switch (t)
     {
         case PlyProperty::Type::INT8:       *((int8_t *)dest) = ply_read_ascii<int32_t>(is);        break;
@@ -169,7 +186,7 @@ void PlyFile::read_property_ascii(PlyProperty::Type t, void * dest, size_t & des
         case PlyProperty::Type::FLOAT64:    ply_cast_ascii<double>(dest, is);                       break;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
-    destOffset += PropertyTable[t].stride;
+    return PropertyTable[t].stride;
 }
 
 void PlyFile::write_property_ascii(PlyProperty::Type t, std::ostream & os, uint8_t * src, size_t & srcOffset)
@@ -196,9 +213,19 @@ void PlyFile::write_property_binary(PlyProperty::Type t, std::ostream & os, uint
     srcOffset += PropertyTable[t].stride;
 }
 
-void PlyFile::read(std::istream & is)
+void PlyFile::read()
 {
-    read_internal(is);
+    std::cout << "READ INTERNAL - FIRST PASS" << std::endl;
+    read_internal(true); // Parse but only get the data size
+
+    for (auto & cursor : userDataTable)
+    {
+        std::cout << "Cursor Key: " << cursor.first << " allocating " << cursor.second->size << " bytes " << std::endl;
+        cursor.second->data = new uint8_t[cursor.second->size];
+    }
+
+    std::cout << "READ INTERNAL - SECOND PASS" << std::endl;
+    read_internal();
 }
 
 void PlyFile::write(std::ostream & os, bool _isBinary)
@@ -301,59 +328,60 @@ void PlyFile::write_header(std::ostream & os)
     os << "end_header\n";
 }
 
-void PlyFile::read_internal(std::istream & is)
+void PlyFile::read_internal(bool firstPass)
 {
-    std::function<void(PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & is)> read;
-    std::function<void(const PlyProperty & property, std::istream & is)> skip;
+    std::function<size_t(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is)> read;
+    std::function<size_t(const PlyProperty & p, std::istream & is)> skip;
+
     if (isBinary)
     {
-        read = [&](PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & _is) { read_property_binary(t, dest, destOffset, _is); };
-        skip = [&](const PlyProperty & property, std::istream & _is) { skip_property_binary(property, _is); };
+        read = [&](const PlyProperty & p, void * dest, size_t & destOffset, std::istream & _is) { return read_property_binary(p, dest, destOffset, _is); };
+        skip = [&](const PlyProperty & p, std::istream & _is) { return skip_property_binary(p, _is); };
     }
     else
     {
-        read = [&](PlyProperty::Type t, void * dest, size_t & destOffset, std::istream & _is) { read_property_ascii(t, dest, destOffset, _is); };
-        skip = [&](const PlyProperty & property, std::istream & _is) { skip_property_ascii(property, _is); };
+        read = [&](const PlyProperty & p, void * dest, size_t & destOffset, std::istream & _is) { return read_property_ascii(p, dest, destOffset, _is); };
+        skip = [&](const PlyProperty & p, std::istream & _is) { return skip_property_ascii(p, _is); };
     }
 
     for (auto & element : get_elements())
     {
-        if (std::find(requestedElements.begin(), requestedElements.end(), element.name) != requestedElements.end())
+        for (size_t count = 0; count < element.size; ++count)
         {
-            for (size_t count = 0; count < element.size; ++count)
+            for (auto & property : element.properties)
             {
-                for (auto & property : element.properties)
+                auto cursorIt = userDataTable.find(make_key(element.name, property.name));
+                if (cursorIt != userDataTable.end())
                 {
-                    if (auto & cursor = userDataTable[make_key(element.name, property.name)])
+                    auto cursor = cursorIt->second;
+                    if (!firstPass)
                     {
                         if (property.isList)
                         {
-							size_t listSize = 0;
-							size_t dummyCount = 0;
-                            read(property.listType, &listSize, dummyCount, is);
-                            if (cursor->realloc == false)
-                            {
-                                cursor->realloc = true;
-                                resize_vector(property.propertyType, cursor->vector, listSize * element.size, cursor->data);
-                            }
+                            size_t listSize = 0;
+                            size_t dummyCount = 0;
+                            read(property, &listSize, dummyCount, is);
                             for (size_t i = 0; i < listSize; ++i)
                             {
-                                read(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
+                                read(property, (cursor->data + cursor->offset), cursor->offset, is);
                             }
                         }
                         else
                         {
-                            read(property.propertyType, (cursor->data + cursor->offset), cursor->offset, is);
+                            read(property, (cursor->data + cursor->offset), cursor->offset, is);
                         }
                     }
                     else
                     {
-                        skip(property, is);
+                        cursor->size += skip(property, is);
                     }
+                }
+                else
+                {
+                    skip(property, is);
                 }
             }
         }
-        else continue;
     }
 }
 
