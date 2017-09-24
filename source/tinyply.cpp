@@ -1,6 +1,7 @@
 // This software is in the public domain. Where that dedication is not
 // recognized, you are granted a perpetual, irrevocable license to copy,
 // distribute, and modify this file as you see fit.
+
 // Authored in 2015 by Dimitri Diakopoulos (http://www.dimitridiakopoulos.com)
 // https://github.com/ddiakopoulos/tinyply
 
@@ -114,7 +115,6 @@ size_t PlyFile::skip_property_binary(const PlyProperty & p, std::istream & is)
 		size_t dummyCount = 0;
         read_property_binary(p, &listSize, dummyCount, is);
         for (size_t i = 0; i < listSize; ++i) is.read(skip.data(), PropertyTable[p.propertyType].stride);
-        std::cout << "Skipping with list size: " << listSize << std::endl;
         return listSize * PropertyTable[p.propertyType].stride; // in bytes
     }
     else
@@ -126,8 +126,6 @@ size_t PlyFile::skip_property_binary(const PlyProperty & p, std::istream & is)
 
 size_t PlyFile::skip_property_ascii(const PlyProperty & p, std::istream & is)
 {
-    const PlyProperty::Type t = (p.isList) ? p.listType : p.propertyType;
-
     std::string skip;
     if (p.isList)
     {
@@ -135,12 +133,12 @@ size_t PlyFile::skip_property_ascii(const PlyProperty & p, std::istream & is)
         size_t dummyCount = 0;
         read_property_ascii(p, &listSize, dummyCount, is);
         for (size_t i = 0; i < listSize; ++i) is >> skip;
-        return listSize * PropertyTable[t].stride; // in bytes
+        return listSize * PropertyTable[p.propertyType].stride; // in bytes
     }
     else
     {
         is >> skip;
-        return PropertyTable[t].stride;
+        return PropertyTable[p.propertyType].stride;
     }
 }
 
@@ -220,8 +218,8 @@ void PlyFile::read()
 
     for (auto & cursor : userDataTable)
     {
-        std::cout << "Cursor Key: " << cursor.first << " allocating " << cursor.second->size << " bytes " << std::endl;
-        cursor.second->data = new uint8_t[cursor.second->size];
+        std::cout << "Cursor Key: " << cursor.first << " allocating " << cursor.second->sizeBytes << " bytes " << std::endl;
+        cursor.second->data.resize(cursor.second->sizeBytes);
     }
 
     std::cout << "READ INTERNAL - SECOND PASS" << std::endl;
@@ -254,12 +252,12 @@ void PlyFile::write_binary_internal(std::ostream & os)
                     write_property_binary(p.listType, os, listSize, dummyCount);
                     for (int j = 0; j < p.listCount; ++j)
                     {
-                        write_property_binary(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
+                        write_property_binary(p.propertyType, os, (cursor->data.data() + cursor->byteOffset), cursor->byteOffset);
                     }
                 }
                 else
                 {
-                    write_property_binary(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
+                    write_property_binary(p.propertyType, os, (cursor->data.data() + cursor->byteOffset), cursor->byteOffset);
                 }
             }
         }
@@ -282,12 +280,12 @@ void PlyFile::write_ascii_internal(std::ostream & os)
                     os << p.listCount << " ";
                     for (int j = 0; j < p.listCount; ++j)
                     {
-                        write_property_ascii(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
+                        write_property_ascii(p.propertyType, os, (cursor->data.data() + cursor->byteOffset), cursor->byteOffset);
                     }
                 }
                 else
                 {
-                    write_property_ascii(p.propertyType, os, (cursor->data + cursor->offset), cursor->offset);
+                    write_property_ascii(p.propertyType, os, (cursor->data.data() + cursor->byteOffset), cursor->byteOffset);
                 }
             }
             os << "\n";
@@ -363,17 +361,17 @@ void PlyFile::read_internal(bool firstPass)
                             read(property, &listSize, dummyCount, is);
                             for (size_t i = 0; i < listSize; ++i)
                             {
-                                read(property, (cursor->data + cursor->offset), cursor->offset, is);
+                                read(property, (cursor->data.data() + cursor->byteOffset), cursor->byteOffset, is);
                             }
                         }
                         else
                         {
-                            read(property, (cursor->data + cursor->offset), cursor->offset, is);
+                            read(property, (cursor->data.data() + cursor->byteOffset), cursor->byteOffset, is);
                         }
                     }
                     else
                     {
-                        cursor->size += skip(property, is);
+                        cursor->sizeBytes += skip(property, is);
                     }
                 }
                 else

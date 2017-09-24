@@ -1,6 +1,7 @@
 // This software is in the public domain. Where that dedication is not
 // recognized, you are granted a perpetual, irrevocable license to copy,
 // distribute, and modify this file as you see fit.
+
 // Authored in 2015 by Dimitri Diakopoulos (http://www.dimitridiakopoulos.com)
 // https://github.com/ddiakopoulos/tinyply
 
@@ -42,18 +43,6 @@ namespace tinyply
 	inline float endian_swap_float(const uint32_t & v) { union {float f; uint32_t i;}; i = endian_swap(v); return f; }
 	inline double endian_swap_double(const uint64_t & v) { union {double d; uint64_t i;}; i = endian_swap(v); return d; }
 
-	struct DataCursor
-	{
-		uint8_t * data; // std shared_ptr to std::vector
-		size_t offset;
-        size_t size;
-	};
-
-    inline std::string make_key(const std::string & a, const std::string & b)
-    {
-        return (a + "-" + b);
-    }
-
 	class PlyProperty
 	{
 		void parse_internal(std::istream & is);
@@ -81,6 +70,21 @@ namespace tinyply
 		std::string name;
 		int listCount = 0;
 	};
+
+    struct ParsedData
+    {
+        PlyProperty::Type type;
+        std::vector<uint8_t> data;
+        size_t byteOffset;
+        size_t sizeBytes;
+        size_t count;
+        bool valid;
+    };
+
+    inline std::string make_key(const std::string & a, const std::string & b)
+    {
+        return (a + "-" + b);
+    }
 
 	template<typename T>
 	void ply_cast(void * dest, const char * src, bool be)
@@ -182,19 +186,22 @@ namespace tinyply
 		std::vector<std::string> objInfo;
 
         // Returns the size (in bytes)
-		size_t request_properties_from_element(const std::string & elementKey, std::vector<std::string> propertyKeys)
+        std::shared_ptr<ParsedData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys)
 		{
-			if (get_elements().size() == 0) return 0;
-            if (!propertyKeys.size()) return 0;
+            std::shared_ptr<ParsedData> cursor = std::make_shared<ParsedData>();
+            cursor->byteOffset = 0;
+            cursor->sizeBytes = 0;
+            cursor->valid = false;
+
+            if (get_elements().size() == 0) throw std::runtime_error("parsed header had no elements defined. malformed file?");
+            if (!propertyKeys.size()) throw std::invalid_argument("`propertyKeys` argument is empty");
+            if (elementKey.size() == 0) throw std::invalid_argument("`elementKey` argument is empty");
 
             const int elementIndex = find_element(elementKey, get_elements());
 
             // Sanity check if the user requested element is in the pre-parsed header
 			if (elementIndex >= 0)
 			{
-                std::cout << "looking for: " << elementKey << std::endl;
-                std::cout << "Index of element is: " << elementIndex << std::endl;
-
                 // We found the element
                 const PlyElement & element = get_elements()[elementIndex];
 
@@ -209,37 +216,16 @@ namespace tinyply
                         const PlyProperty & property = element.properties[propertyIndex];
 
                         // All requested properties in the userDataTable share the same cursor (thrown into the same flat array)
-                        std::shared_ptr<DataCursor> cursor = std::make_shared<DataCursor>();
-                        cursor->offset = 0;
-                        cursor->size = 0;
+                        auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<ParsedData>>(make_key(element.name, property.name), cursor));
+                        if (result.second == false) throw std::invalid_argument("element-property key has already been requested: " + make_key(element.name, property.name));
 
-                        auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(make_key(element.name, property.name), cursor));
-                        if (result.second == false)
-                        {
-                            //throw std::invalid_argument("property has already been requested");
-                        }
+                        cursor->valid = true;
                     }
                 }
 			}
-			else return 0;
+			else throw std::invalid_argument("`elementKey` was not found in the header");
 
-
-            for (auto & cursor : userDataTable)
-            {
-                std::cout << "Cursor Key: " << cursor.first << std::endl;
-            }
-            std::cout << "-----" << std::endl;
-
-            return 0;
-
-            /*
-			if (listCount > 1)
-			{
-				return (totalInstanceSize / propertyKeys.size()) / listCount;
-			}
-            */
-
-			//return totalInstanceSize / propertyKeys.size();
+            return cursor;
 		}
 
         /*
@@ -303,7 +289,7 @@ namespace tinyply
 		bool isBinary = false;
 		bool isBigEndian = false;
 
-		std::map<std::string, std::shared_ptr<DataCursor>> userDataTable;
+		std::map<std::string, std::shared_ptr<ParsedData>> userDataTable;
 
 		std::vector<PlyElement> elements;
 	};

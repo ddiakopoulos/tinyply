@@ -153,41 +153,23 @@ void read_ply_file(const std::string & filename)
 			std::cout << "Comment: " << c << std::endl;
 		}
 
-		// Define containers to hold the extracted data. The type must match
-		// the property type given in the header. Tinyply will interally allocate the
-		// the appropriate amount of memory.
-		std::vector<float> verts;
-		std::vector<float> norms;
-		std::vector<uint8_t> colors;
-
-		std::vector<uint32_t> faces;
-		std::vector<float> uvCoords;
-
-		uint32_t vertexCount, normalCount, colorCount, faceCount, faceTexcoordCount, faceColorCount;
-		vertexCount = normalCount = colorCount = faceCount = faceTexcoordCount = faceColorCount = 0;
-
 		// The count returns the number of instances of the property group. The vectors
 		// above will be resized into a multiple of the property group size as
 		// they are "flattened"... i.e. verts = {x, y, z, x, y, z, ...}
-		vertexCount = file.request_properties_from_element("vertex", { "x", "y", "z" });
-		normalCount = file.request_properties_from_element("vertex", { "nx", "ny", "nz" });
+		auto vertices = file.request_properties_from_element("vertex", { "x", "y", "z" });
+		auto normals = file.request_properties_from_element("vertex", { "nx", "ny", "nz" });
 		//colorCount = file.request_properties_from_element("vertex", { "red", "green", "blue", "alpha" });
 
-		// For properties that are list types, it is possibly to specify the expected count (ideal if a
-		// consumer of this library knows the layout of their format a-priori). Otherwise, tinyply
-		// defers allocation of memory until the first instance of the property has been found
-		// as implemented in file.read(ss)
-		faceCount = file.request_properties_from_element("face", { "vertex_indices" });
+		auto faces = file.request_properties_from_element("face", { "vertex_indices" });
 		//faceTexcoordCount = file.request_properties_from_element("face", { "texcoord" });
 
-		// Now populate the vectors...
 		timepoint before = now();
 		file.read();
 		timepoint after = now();
 
 		// Good place to put a breakpoint!
 		std::cout << "Parsing took " << difference_millis(before, after) << " ms: " << std::endl;
-		std::cout << "\tRead " << verts.size() << " total vertices (" << vertexCount << " properties)." << std::endl;
+		std::cout << "\tRead " << vertices->count << " total vertices (" << vertices->data.size() << " properties)." << std::endl;
 
 		//std::cout << "\tRead " << norms.size() << " total normals (" << normalCount << " properties)." << std::endl;
 		//std::cout << "\tRead " << colors.size() << " total vertex colors (" << colorCount << " properties)." << std::endl;
