@@ -216,10 +216,23 @@ void PlyFile::read()
     std::cout << "READ INTERNAL - FIRST PASS" << std::endl;
     read_internal(true); // Parse but only get the data size
 
-    for (auto & cursor : userDataTable)
+    std::vector<std::shared_ptr<ParsedData>> uniqueCursors;
+
+    for (auto & key : userDataTable)
     {
-        std::cout << "Cursor Key: " << cursor.first << " allocating " << cursor.second->sizeBytes << " bytes " << std::endl;
-        cursor.second->data.resize(cursor.second->sizeBytes);
+        //key.second->data.resize(key.second->sizeBytes);
+        uniqueCursors.push_back(key.second);
+    }
+
+
+    // Since group-requested properties share the same cursor, we need to find unique cursors
+    std::sort(uniqueCursors.begin(), uniqueCursors.end());
+    uniqueCursors.erase(std::unique(uniqueCursors.begin(), uniqueCursors.end()), uniqueCursors.end());
+
+    for (auto & cursor : uniqueCursors)
+    {
+        std::cout << "Cursor: " << cursor << " allocating " << cursor->sizeBytes << " bytes " << std::endl;
+        cursor->data.resize(cursor->sizeBytes);
     }
 
     std::cout << "READ INTERNAL - SECOND PASS" << std::endl;

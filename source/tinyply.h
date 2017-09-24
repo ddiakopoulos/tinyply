@@ -188,6 +188,7 @@ namespace tinyply
         // Returns the size (in bytes)
         std::shared_ptr<ParsedData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys)
 		{
+            // All requested properties in the userDataTable share the same cursor (thrown into the same flat array)
             std::shared_ptr<ParsedData> cursor = std::make_shared<ParsedData>();
             cursor->byteOffset = 0;
             cursor->sizeBytes = 0;
@@ -205,6 +206,8 @@ namespace tinyply
                 // We found the element
                 const PlyElement & element = get_elements()[elementIndex];
 
+                cursor->count = element.size;
+
                 // Find each of the keys
                 for (auto key : propertyKeys)
                 {
@@ -215,12 +218,12 @@ namespace tinyply
                         // We found the property
                         const PlyProperty & property = element.properties[propertyIndex];
 
-                        // All requested properties in the userDataTable share the same cursor (thrown into the same flat array)
                         auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<ParsedData>>(make_key(element.name, property.name), cursor));
                         if (result.second == false) throw std::invalid_argument("element-property key has already been requested: " + make_key(element.name, property.name));
 
                         cursor->valid = true;
                     }
+                    else throw std::invalid_argument("one of the property keys was not found in the header: " + key);
                 }
 			}
 			else throw std::invalid_argument("`elementKey` was not found in the header");
