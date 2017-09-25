@@ -148,7 +148,7 @@ size_t PlyFile::read_property_binary(const PlyProperty & p, void * dest, size_t 
 
     destOffset += PropertyTable[t].stride;
 
-    static std::vector<char> src(PropertyTable[t].stride);
+    std::vector<char> src(PropertyTable[t].stride);
     is.read(src.data(), PropertyTable[t].stride);
 
     switch (t)
@@ -163,6 +163,7 @@ size_t PlyFile::read_property_binary(const PlyProperty & p, void * dest, size_t 
         case PlyProperty::Type::FLOAT64:    ply_cast_double<double>(dest, src.data(), isBigEndian); break;
         case PlyProperty::Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
+
     return PropertyTable[t].stride;
 }
 
@@ -213,29 +214,17 @@ void PlyFile::write_property_binary(PlyProperty::Type t, std::ostream & os, uint
 
 void PlyFile::read()
 {
-    std::cout << "READ INTERNAL - FIRST PASS" << std::endl;
-    read_internal(true); // Parse but only get the data size
+    // Parse but only get the data size
+    read_internal(true);
 
     std::vector<std::shared_ptr<ParsedData>> uniqueCursors;
+    for (auto & key : userDataTable) uniqueCursors.push_back(key.second);
 
-    for (auto & key : userDataTable)
-    {
-        //key.second->data.resize(key.second->sizeBytes);
-        uniqueCursors.push_back(key.second);
-    }
-
-
-    // Since group-requested properties share the same cursor, we need to find unique cursors
+    // Since group-requested properties share the same cursor, we need to find unique cursors so we only allocate once
     std::sort(uniqueCursors.begin(), uniqueCursors.end());
     uniqueCursors.erase(std::unique(uniqueCursors.begin(), uniqueCursors.end()), uniqueCursors.end());
+    for (auto & cursor : uniqueCursors) cursor->data.resize(cursor->sizeBytes);
 
-    for (auto & cursor : uniqueCursors)
-    {
-        std::cout << "Cursor: " << cursor << " allocating " << cursor->sizeBytes << " bytes " << std::endl;
-        cursor->data.resize(cursor->sizeBytes);
-    }
-
-    std::cout << "READ INTERNAL - SECOND PASS" << std::endl;
     read_internal();
 }
 
@@ -343,6 +332,8 @@ void PlyFile::read_internal(bool firstPass)
 {
     std::function<size_t(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is)> read;
     std::function<size_t(const PlyProperty & p, std::istream & is)> skip;
+    
+    const auto start = is.tellg();
 
     if (isBinary)
     {
@@ -364,7 +355,7 @@ void PlyFile::read_internal(bool firstPass)
                 auto cursorIt = userDataTable.find(make_key(element.name, property.name));
                 if (cursorIt != userDataTable.end())
                 {
-                    auto cursor = cursorIt->second;
+                    auto & cursor = cursorIt->second;
                     if (!firstPass)
                     {
                         if (property.isList)
@@ -394,5 +385,8 @@ void PlyFile::read_internal(bool firstPass)
             }
         }
     }
+
+    // Reset istream reader to the beginning
+    if (firstPass) is.seekg(start, is.beg);
 }
 

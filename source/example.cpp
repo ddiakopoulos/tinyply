@@ -153,9 +153,6 @@ void read_ply_file(const std::string & filename)
 			std::cout << "Comment: " << c << std::endl;
 		}
 
-		// The count returns the number of instances of the property group. The vectors
-		// above will be resized into a multiple of the property group size as
-		// they are "flattened"... i.e. verts = {x, y, z, x, y, z, ...}
 		auto vertices = file.request_properties_from_element("vertex", { "x", "y", "z" });
 		auto normals = file.request_properties_from_element("vertex", { "nx", "ny", "nz" });
 		//colorCount = file.request_properties_from_element("vertex", { "red", "green", "blue", "alpha" });
@@ -171,6 +168,13 @@ void read_ply_file(const std::string & filename)
 		std::cout << "Parsing took " << difference_millis(before, after) << " ms: " << std::endl;
 		std::cout << "\tRead " << vertices->count << " total vertices (" << vertices->data.size() << " properties)." << std::endl;
 
+
+        for (size_t i = 0; i < vertices->data.size(); i+=12)
+        {
+            std::cout << "1 " << *reinterpret_cast<float*>(&vertices->data[i + 0]) << std::endl;
+            std::cout << "2 " << *reinterpret_cast<float*>(&vertices->data[i + 4]) << std::endl;
+            std::cout << "3 " << *reinterpret_cast<float*>(&vertices->data[i + 8]) << std::endl;
+        }
 		//std::cout << "\tRead " << norms.size() << " total normals (" << normalCount << " properties)." << std::endl;
 		//std::cout << "\tRead " << colors.size() << " total vertex colors (" << colorCount << " properties)." << std::endl;
 		//std::cout << "\tRead " << faces.size() << " total faces (triangles) (" << faceCount << " properties)." << std::endl;

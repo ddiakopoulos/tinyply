@@ -73,7 +73,6 @@ namespace tinyply
 
     struct ParsedData
     {
-        PlyProperty::Type type;
         std::vector<uint8_t> data;
         size_t byteOffset;
         size_t sizeBytes;
