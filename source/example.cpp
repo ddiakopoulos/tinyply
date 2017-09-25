@@ -132,11 +132,15 @@ void read_ply_file(const std::string & filename)
 
         if (ss.fail()) 
         {
-            std::cout << "Failed to open " << filename << std::endl;
+            throw std::runtime_error("failed to open " + filename);
         }
 
 		// Parse the ASCII header fields
 		PlyFile file(ss);
+
+        std::cout << "================================================================\n";
+
+        for (auto c : file.comments) std::cout << "Comment: " << c << std::endl;
 
 		for (auto e : file.get_elements())
 		{
@@ -146,19 +150,25 @@ void read_ply_file(const std::string & filename)
 				std::cout << "\tproperty - " << p.name << " (" << PropertyTable[p.propertyType].str << ")" << std::endl;
 			}
 		}
-		std::cout << std::endl;
 
-		for (auto c : file.comments)
-		{
-			std::cout << "Comment: " << c << std::endl;
-		}
+        std::cout << "================================================================\n";
 
-		auto vertices = file.request_properties_from_element("vertex", { "x", "y", "z" });
-		auto normals = file.request_properties_from_element("vertex", { "nx", "ny", "nz" });
-		//colorCount = file.request_properties_from_element("vertex", { "red", "green", "blue", "alpha" });
+        std::shared_ptr<ParsedData> vertices, normals, colors, faces, texcoords;
 
-		auto faces = file.request_properties_from_element("face", { "vertex_indices" });
-		//faceTexcoordCount = file.request_properties_from_element("face", { "texcoord" });
+        try { vertices = file.request_properties_from_element("vertex", { "x", "y", "z" }); }
+        catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+
+        try { normals = file.request_properties_from_element("vertex", { "nx", "ny", "nz" }); }
+        catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+
+        try { colors = file.request_properties_from_element("vertex", { "red", "green", "blue", "alpha" }); }
+        catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+
+        try { faces = file.request_properties_from_element("face", { "vertex_indices" }); }
+        catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+
+        try { texcoords = file.request_properties_from_element("face", { "texcoord" }); }
+        catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
 		timepoint before = now();
 		file.read();
@@ -166,8 +176,11 @@ void read_ply_file(const std::string & filename)
 
 		// Good place to put a breakpoint!
 		std::cout << "Parsing took " << difference_millis(before, after) << " ms: " << std::endl;
-		std::cout << "\tRead " << vertices->count << " total vertices (" << vertices->data.size() << " properties)." << std::endl;
-
+		if (vertices) std::cout << "\tRead " << vertices->count << " total vertices (" << vertices->data.size() << " individual properties)." << std::endl;
+        if (normals) std::cout << "\tRead " << normals->count << " total vertex normals (" << normals->data.size() << " individual properties)." << std::endl;
+        if (colors) std::cout << "\tRead " << colors->count << " total vertex colors (" << colors->data.size() << " individual properties)." << std::endl;
+        if (faces) std::cout << "\tRead " << faces->count << " total faces (triangles) (" << faces->data.size() << " individual properties)." << std::endl;
+        if (texcoords) std::cout << "\tRead " << texcoords->count << " total texcoords (" << texcoords->data.size() << " individual properties)." << std::endl;
 
         for (size_t i = 0; i < vertices->data.size(); i+=12)
         {
@@ -175,6 +188,7 @@ void read_ply_file(const std::string & filename)
             std::cout << "2 " << *reinterpret_cast<float*>(&vertices->data[i + 4]) << std::endl;
             std::cout << "3 " << *reinterpret_cast<float*>(&vertices->data[i + 8]) << std::endl;
         }
+
 		//std::cout << "\tRead " << norms.size() << " total normals (" << normalCount << " properties)." << std::endl;
 		//std::cout << "\tRead " << colors.size() << " total vertex colors (" << colorCount << " properties)." << std::endl;
 		//std::cout << "\tRead " << faces.size() << " total faces (triangles) (" << faceCount << " properties)." << std::endl;
@@ -203,13 +217,13 @@ void read_ply_file(const std::string & filename)
 
 	catch (const std::exception & e)
 	{
-		std::cerr << "Caught exception: " << e.what() << std::endl;
+		std::cerr << "Caught tinyply exception: " << e.what() << std::endl;
 	}
 }
 
 int main(int argc, char *argv[])
 {
 	//write_ply_example("example_tetrahedron.ply");
-	read_ply_file("../assets/icosahedron.ply");
+	read_ply_file("../assets/icosahedron_ascii.ply");
 	return 0;
 }

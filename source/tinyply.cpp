@@ -225,7 +225,8 @@ void PlyFile::read()
     uniqueCursors.erase(std::unique(uniqueCursors.begin(), uniqueCursors.end()), uniqueCursors.end());
     for (auto & cursor : uniqueCursors) cursor->data.resize(cursor->sizeBytes);
 
-    read_internal();
+    // Populate the data
+    read_internal(false);
 }
 
 void PlyFile::write(std::ostream & os, bool _isBinary)
@@ -301,13 +302,10 @@ void PlyFile::write_header(std::ostream & os)
     os.imbue(fixLoc);
 
     os << "ply\n";
-    if (isBinary)
-        os << ((isBigEndian) ? "format binary_big_endian 1.0" : "format binary_little_endian 1.0") << "\n";
-    else
-        os << "format ascii 1.0\n";
+    if (isBinary) os << ((isBigEndian) ? "format binary_big_endian 1.0" : "format binary_little_endian 1.0") << "\n";
+    else os << "format ascii 1.0\n";
 
-    for (const auto & comment : comments)
-        os << "comment " << comment << "\n";
+    for (const auto & comment : comments) os << "comment " << comment << "\n";
 
     for (auto & e : elements)
     {

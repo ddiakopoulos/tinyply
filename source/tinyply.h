@@ -225,7 +225,7 @@ namespace tinyply
                     else throw std::invalid_argument("one of the property keys was not found in the header: " + key);
                 }
 			}
-			else throw std::invalid_argument("`elementKey` was not found in the header");
+			else throw std::invalid_argument("the element key was not found in the header: " + elementKey);
 
             return cursor;
 		}
