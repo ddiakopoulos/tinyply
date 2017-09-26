@@ -40,7 +40,7 @@ namespace tinyply
     {
         Type t;
         size_t count;
-        std::vector<uint8_t> data;
+        std::vector<uint8_t> buffer;
     };
 
     struct PropertyInfo 
@@ -49,7 +49,7 @@ namespace tinyply
         std::string str; 
     };
 
-    static const std::map<Type, PropertyInfo> PropertyTable
+    static std::map<Type, PropertyInfo> PropertyTable
     {
         { Type::INT8,{ 1, "char" } },
         { Type::UINT8,{ 1, "uchar" } },
@@ -102,6 +102,7 @@ namespace tinyply
         std::unique_ptr<PlyFileImpl> impl;
 
         PlyFile();
+        ~PlyFile();
 
         bool parse_header(std::istream & is);
 
@@ -109,7 +110,7 @@ namespace tinyply
 
 		void write(std::ostream & os, bool isBinary);
 
-        std::vector<PlyElement> & get_elements() const;
+        std::vector<PlyElement> get_elements() const;
         std::vector<std::string> get_comments() const;
         std::vector<std::string> get_info() const;
 

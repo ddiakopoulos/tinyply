@@ -136,11 +136,13 @@ void read_ply_file(const std::string & filename)
         }
 
 		// Parse the ASCII header fields
-		PlyFile file(ss);
+        PlyFile file;
+
+        file.parse_header(ss);
 
         std::cout << "================================================================\n";
 
-        for (auto c : file.comments) std::cout << "Comment: " << c << std::endl;
+        for (auto c : file.get_comments()) std::cout << "Comment: " << c << std::endl;
 
 		for (auto e : file.get_elements())
 		{
@@ -153,7 +155,7 @@ void read_ply_file(const std::string & filename)
 
         std::cout << "================================================================\n";
 
-        std::shared_ptr<ParsedData> vertices, normals, colors, faces, texcoords;
+        std::shared_ptr<PlyData> vertices, normals, colors, faces, texcoords;
 
         try { vertices = file.request_properties_from_element("vertex", { "x", "y", "z" }); }
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
@@ -171,16 +173,16 @@ void read_ply_file(const std::string & filename)
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
 		timepoint before = now();
-		file.read();
+        file.read(ss);
 		timepoint after = now();
 
 		// Good place to put a breakpoint!
 		std::cout << "Parsing took " << difference_millis(before, after) << " ms: " << std::endl;
-		if (vertices) std::cout << "\tRead " << vertices->count << " total vertices (" << vertices->data.size() << " individual properties)." << std::endl;
-        if (normals) std::cout << "\tRead " << normals->count << " total vertex normals (" << normals->data.size() << " individual properties)." << std::endl;
-        if (colors) std::cout << "\tRead " << colors->count << " total vertex colors (" << colors->data.size() << " individual properties)." << std::endl;
-        if (faces) std::cout << "\tRead " << faces->count << " total faces (triangles) (" << faces->data.size() << " individual properties)." << std::endl;
-        if (texcoords) std::cout << "\tRead " << texcoords->count << " total texcoords (" << texcoords->data.size() << " individual properties)." << std::endl;
+		if (vertices) std::cout << "\tRead " << vertices->count << " total vertices (" << vertices->buffer.size() << " individual properties)." << std::endl;
+        if (normals) std::cout << "\tRead " << normals->count << " total vertex normals (" << normals->buffer.size() << " individual properties)." << std::endl;
+        if (colors) std::cout << "\tRead " << colors->count << " total vertex colors (" << colors->buffer.size() << " individual properties)." << std::endl;
+        if (faces) std::cout << "\tRead " << faces->count << " total faces (triangles) (" << faces->buffer.size() << " individual properties)." << std::endl;
+        if (texcoords) std::cout << "\tRead " << texcoords->count << " total texcoords (" << texcoords->buffer.size() << " individual properties)." << std::endl;
 
         /*
         for (size_t i = 0; i < vertices->data.size(); i+=12)
