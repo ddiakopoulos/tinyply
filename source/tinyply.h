@@ -45,7 +45,8 @@ namespace tinyply
 
     struct PropertyInfo 
     { 
-        int stride; std::string str; 
+        int stride; 
+        std::string str; 
     };
 
     static const std::map<Type, PropertyInfo> PropertyTable
@@ -102,20 +103,20 @@ namespace tinyply
 
         PlyFile();
 
-        void parse_header(std::istream & is);
+        bool parse_header(std::istream & is);
 
-		void read();
+		void read(std::istream & is);
+
 		void write(std::ostream & os, bool isBinary);
 
-        std::vector<PlyElement> & get_elements();
-        std::vector<std::string> get_comments();
-        std::vector<std::string> get_info();
+        std::vector<PlyElement> & get_elements() const;
+        std::vector<std::string> get_comments() const;
+        std::vector<std::string> get_info() const;
 
         std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
-        void add_properties_to_element(const std::string & elementKey, const std::vector<std::string> & propertyKeys, std::vector<uint8_t> & source, const int listCount = 1, const Type listType = Type::INVALID);
+        void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, std::vector<uint8_t> & source, const int listCount = 1, const Type listType = Type::INVALID);
 	};
 
 } // namesapce tinyply
 
 #endif // tinyply_h
-
