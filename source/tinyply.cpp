@@ -34,36 +34,71 @@ template<> inline int64_t endian_swap(const int64_t & v) { uint64_t r = endian_s
 inline float endian_swap_float(const uint32_t & v) { union { float f; uint32_t i; }; i = endian_swap(v); return f; }
 inline double endian_swap_double(const uint64_t & v) { union { double d; uint64_t i; }; i = endian_swap(v); return d; }
 
-struct PropertyInfo { int stride; std::string str; };
-static std::map<Type, PropertyInfo> PropertyTable
+class PlyFile
 {
-    { Type::INT8,{ 1, "char" } },
-    { Type::UINT8,{ 1, "uchar" } },
-    { Type::INT16,{ 2, "short" } },
-    { Type::UINT16,{ 2, "ushort" } },
-    { Type::INT32,{ 4, "int" } },
-    { Type::UINT32,{ 4, "uint" } },
-    { Type::FLOAT32,{ 4, "float" } },
-    { Type::FLOAT64,{ 8, "double" } },
-    { Type::INVALID,{ 0, "INVALID" } }
+    std::istream & is;
+
+    struct PlyFileImpl;
+    std::unique_ptr<PlyFileImpl> impl;
+
+public:
+
+    PlyFile(std::istream & is);
+
+    void read();
+    void write(std::ostream & os, bool isBinary);
+
+    std::vector<PlyElement> & get_elements();
+
+    std::vector<std::string> comments;
+    std::vector<std::string> objInfo;
+
+    std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
+
+    void add_properties_to_element(const std::string & elementKey, const std::vector<std::string> & propertyKeys, std::vector<uint8_t> & source, const int listCount = 1, const Type listType = Type::INVALID);
+
+private:
+
+    size_t skip_property_binary(const PlyProperty & property, std::istream & is);
+    size_t skip_property_ascii(const PlyProperty & property, std::istream & is);
+
+    size_t read_property_binary(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is);
+    size_t read_property_ascii(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is);
+
+    void write_property_ascii(Type t, std::ostream & os, uint8_t * src, size_t & srcOffset);
+    void write_property_binary(Type t, std::ostream & os, uint8_t * src, size_t & srcOffset);
+
+    bool parse_header(std::istream & is);
+    void write_header(std::ostream & os);
+
+    void read_header_format(std::istream & is);
+    void read_header_element(std::istream & is);
+    void read_header_property(std::istream & is);
+    void read_header_text(std::string line, std::istream & is, std::vector<std::string> & place, int erase = 0);
+
+    void read_internal(bool firstPass = false);
+
+    void write_ascii_internal(std::ostream & os);
+    void write_binary_internal(std::ostream & os);
+
+    bool isBinary = false;
+    bool isBigEndian = false;
+
+    std::map<std::string, std::shared_ptr<PlyData>> userDataTable;
+
+    std::vector<PlyElement> elements;
 };
 
-inline Type property_type_from_string(const std::string & t)
-{
-    if (t == "int8" || t == "char")             return Type::INT8;
-    else if (t == "uint8" || t == "uchar")      return Type::UINT8;
-    else if (t == "int16" || t == "short")      return Type::INT16;
-    else if (t == "uint16" || t == "ushort")    return Type::UINT16;
-    else if (t == "int32" || t == "int")        return Type::INT32;
-    else if (t == "uint32" || t == "uint")      return Type::UINT32;
-    else if (t == "float32" || t == "float")    return Type::FLOAT32;
-    else if (t == "float64" || t == "double")   return Type::FLOAT64;
-    return Type::INVALID;
-}
 
 //////////////////
 // PLY Property //
 //////////////////
+
+struct PlyCursor
+{
+    size_t byteOffset;
+    size_t sizeBytes;
+};
 
 PlyProperty::PlyProperty(std::istream & is) : isList(false)
 {

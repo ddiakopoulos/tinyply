@@ -22,17 +22,6 @@
 
 namespace tinyply
 {
-    struct PlyData
-    {
-        std::vector<uint8_t> data;
-        size_t count;
-    };
-
-    struct PlyCursor
-    {
-        size_t byteOffset;
-        size_t sizeBytes;
-    };
 
     enum class Type : uint8_t
     {
@@ -47,17 +36,54 @@ namespace tinyply
         FLOAT64
     };
 
+    struct PlyData
+    {
+        Type t;
+        size_t count;
+        std::vector<uint8_t> data;
+    };
+
+    struct PropertyInfo 
+    { 
+        int stride; std::string str; 
+    };
+
+    static const std::map<Type, PropertyInfo> PropertyTable
+    {
+        { Type::INT8,{ 1, "char" } },
+        { Type::UINT8,{ 1, "uchar" } },
+        { Type::INT16,{ 2, "short" } },
+        { Type::UINT16,{ 2, "ushort" } },
+        { Type::INT32,{ 4, "int" } },
+        { Type::UINT32,{ 4, "uint" } },
+        { Type::FLOAT32,{ 4, "float" } },
+        { Type::FLOAT64,{ 8, "double" } },
+        { Type::INVALID,{ 0, "INVALID" } }
+    };
+
+    inline Type property_type_from_string(const std::string & t)
+    {
+        if (t == "int8" || t == "char")             return Type::INT8;
+        else if (t == "uint8" || t == "uchar")      return Type::UINT8;
+        else if (t == "int16" || t == "short")      return Type::INT16;
+        else if (t == "uint16" || t == "ushort")    return Type::UINT16;
+        else if (t == "int32" || t == "int")        return Type::INT32;
+        else if (t == "uint32" || t == "uint")      return Type::UINT32;
+        else if (t == "float32" || t == "float")    return Type::FLOAT32;
+        else if (t == "float64" || t == "double")   return Type::FLOAT64;
+        return Type::INVALID;
+    }
+
 	struct PlyProperty
 	{
-
 		PlyProperty(std::istream & is);
 		PlyProperty(Type type, const std::string & _name) : propertyType(type), isList(false), name(_name) {}
 		PlyProperty(Type list_type, Type prop_type, const std::string & _name, int list_count) : listType(list_type), propertyType(prop_type), isList(true), name(_name), listCount(list_count) {}
-
-		Type listType, propertyType;
+        std::string name;
+        Type listType;
+        Type propertyType;
 		bool isList;
-		std::string name;
-		int listCount = 0;
+        int listCount;
 	};
 
 	struct PlyElement
@@ -69,59 +95,24 @@ namespace tinyply
 		std::vector<PlyProperty> properties;
 	};
 
-	class PlyFile
+	struct PlyFile
 	{
-        std::istream & is;
-
         struct PlyFileImpl;
         std::unique_ptr<PlyFileImpl> impl;
 
-	public:
+        PlyFile();
 
-		PlyFile(std::istream & is);
+        void parse_header(std::istream & is);
 
 		void read();
 		void write(std::ostream & os, bool isBinary);
 
         std::vector<PlyElement> & get_elements();
-
-		std::vector<std::string> comments;
-		std::vector<std::string> objInfo;
+        std::vector<std::string> get_comments();
+        std::vector<std::string> get_info();
 
         std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
-
         void add_properties_to_element(const std::string & elementKey, const std::vector<std::string> & propertyKeys, std::vector<uint8_t> & source, const int listCount = 1, const Type listType = Type::INVALID);
-
-	private:
-
-		size_t skip_property_binary(const PlyProperty & property, std::istream & is);
-		size_t skip_property_ascii(const PlyProperty & property, std::istream & is);
-
-		size_t read_property_binary(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is);
-        size_t read_property_ascii(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is);
-
-		void write_property_ascii(Type t, std::ostream & os, uint8_t * src, size_t & srcOffset);
-		void write_property_binary(Type t, std::ostream & os, uint8_t * src, size_t & srcOffset);
-
-		bool parse_header(std::istream & is);
-		void write_header(std::ostream & os);
-
-		void read_header_format(std::istream & is);
-		void read_header_element(std::istream & is);
-		void read_header_property(std::istream & is);
-		void read_header_text(std::string line, std::istream & is, std::vector<std::string> & place, int erase = 0);
-
-		void read_internal(bool firstPass = false);
-
-		void write_ascii_internal(std::ostream & os);
-		void write_binary_internal(std::ostream & os);
-
-		bool isBinary = false;
-		bool isBigEndian = false;
-
-		std::map<std::string, std::shared_ptr<PlyData>> userDataTable;
-
-		std::vector<PlyElement> elements;
 	};
 
 } // namesapce tinyply
