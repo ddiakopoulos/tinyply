@@ -377,7 +377,7 @@ namespace tinyply
 		std::vector<std::string> requestedElements;
 	};
 
-} // namesapce tinyply
+} // namespace tinyply
 
 #endif // tinyply_h
 
