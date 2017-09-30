@@ -6,6 +6,10 @@
 // https://github.com/ddiakopoulos/tinyply
 
 #include "tinyply.h"
+#include <algorithm>
+#include <map>
+#include <functional>
+#include <type_traits>
 
 using namespace tinyply;
 using namespace std;
@@ -38,6 +42,38 @@ inline double endian_swap_double(const uint64_t & v) { union { double d; uint64_
 // Internal Implementation //
 /////////////////////////////
 
+struct PropertyInfo
+{
+    int stride;
+    std::string str;
+};
+
+static std::map<Type, PropertyInfo> PropertyTable
+{
+    { Type::INT8,{ 1, "char" } },
+    { Type::UINT8,{ 1, "uchar" } },
+    { Type::INT16,{ 2, "short" } },
+    { Type::UINT16,{ 2, "ushort" } },
+    { Type::INT32,{ 4, "int" } },
+    { Type::UINT32,{ 4, "uint" } },
+    { Type::FLOAT32,{ 4, "float" } },
+    { Type::FLOAT64,{ 8, "double" } },
+    { Type::INVALID,{ 0, "INVALID" } }
+};
+
+inline Type property_type_from_string(const std::string & t)
+{
+    if (t == "int8" || t == "char")             return Type::INT8;
+    else if (t == "uint8" || t == "uchar")      return Type::UINT8;
+    else if (t == "int16" || t == "short")      return Type::INT16;
+    else if (t == "uint16" || t == "ushort")    return Type::UINT16;
+    else if (t == "int32" || t == "int")        return Type::INT32;
+    else if (t == "uint32" || t == "uint")      return Type::UINT32;
+    else if (t == "float32" || t == "float")    return Type::FLOAT32;
+    else if (t == "float64" || t == "double")   return Type::FLOAT64;
+    return Type::INVALID;
+}
+
 struct PlyFile::PlyFileImpl
 {
     struct PlyCursor
@@ -52,6 +88,8 @@ struct PlyFile::PlyFileImpl
         PlyCursor cursor;
     };
 
+    ~PlyFileImpl();
+
     std::map<std::string, ParsingHelper> userData;
 
     bool isBinary = false;
@@ -64,7 +102,7 @@ struct PlyFile::PlyFileImpl
     void write(std::ostream & os, bool isBinary);
 
     std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
-    void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, std::vector<uint8_t> & source, const int listCount = 1, const Type listType = Type::INVALID);
+    void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, std::vector<uint8_t> & source, const int listCount, const Type listType);
 
     size_t read_property_binary(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is);
     size_t read_property_ascii(const PlyProperty & p, void * dest, size_t & destOffset, std::istream & is);
@@ -84,6 +122,14 @@ struct PlyFile::PlyFileImpl
     void write_property_ascii(Type t, std::ostream & os, uint8_t * src, size_t & srcOffset);
     void write_property_binary(Type t, std::ostream & os, uint8_t * src, size_t & srcOffset);
 };
+
+PlyFile::PlyFileImpl::~PlyFileImpl()
+{
+    for (auto & entry : userData)
+    {
+        entry.second.
+    }
+}
 
 //////////////////
 // PLY Property //
@@ -173,10 +219,7 @@ bool PlyFile::PlyFileImpl::parse_header(std::istream & is)
         std::istringstream ls(line);
         std::string token;
         ls >> token;
-        if (token == "ply" || token == "PLY" || token == "")
-        {
-            continue;
-        }
+        if (token == "ply" || token == "PLY" || token == "") continue;
         else if (token == "comment")    read_header_text(line, ls, comments, 8);
         else if (token == "format")     read_header_format(ls);
         else if (token == "element")    read_header_element(ls);
@@ -363,17 +406,17 @@ void PlyFile::PlyFileImpl::write_binary_internal(std::ostream & os)
                 if (p.isList)
                 {
                     uint8_t listSize[4] = {0, 0, 0, 0};
-                    memcpy(listSize, &p.listCount, sizeof(uint32_t));
+                    std::memcpy(listSize, &p.listCount, sizeof(uint32_t));
 					size_t dummyCount = 0;
                     write_property_binary(p.listType, os, listSize, dummyCount);
                     for (int j = 0; j < p.listCount; ++j)
                     {
-                        write_property_binary(p.propertyType, os, (helper.data->buffer.data() + helper.cursor.byteOffset), helper.cursor.byteOffset);
+                        write_property_binary(p.propertyType, os, (helper.data->buffer + helper.cursor.byteOffset), helper.cursor.byteOffset);
                     }
                 }
                 else
                 {
-                    write_property_binary(p.propertyType, os, (helper.data->buffer.data() + helper.cursor.byteOffset), helper.cursor.byteOffset);
+                    write_property_binary(p.propertyType, os, (helper.data->buffer + helper.cursor.byteOffset), helper.cursor.byteOffset);
                 }
             }
         }
@@ -396,12 +439,12 @@ void PlyFile::PlyFileImpl::write_ascii_internal(std::ostream & os)
                     os << p.listCount << " ";
                     for (int j = 0; j < p.listCount; ++j)
                     {
-                        write_property_ascii(p.propertyType, os, (helper.data->buffer.data() + helper.cursor.byteOffset), helper.cursor.byteOffset);
+                        write_property_ascii(p.propertyType, os, (helper.data->buffer + helper.cursor.byteOffset), helper.cursor.byteOffset);
                     }
                 }
                 else
                 {
-                    write_property_ascii(p.propertyType, os, (helper.data->buffer.data() + helper.cursor.byteOffset), helper.cursor.byteOffset);
+                    write_property_ascii(p.propertyType, os, (helper.data->buffer + helper.cursor.byteOffset), helper.cursor.byteOffset);
                 }
             }
             os << "\n";
@@ -487,7 +530,7 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
     return helper.data;
 }
 
-void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, std::vector<uint8_t> & source, const int listCount, const Type listType)
+void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, std::vector<uint8_t> & source, const int listCount, const Type listType)
 {
     /*
     ParsingHelper helper;
@@ -560,12 +603,12 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
                             read(property, &listSize, dummyCount, is);
                             for (size_t i = 0; i < listSize; ++i)
                             {
-                                read(property, (helper.data->buffer.data() + helper.cursor.byteOffset), helper.cursor.byteOffset, is);
+                                read(property, (helper.data->buffer + helper.cursor.byteOffset), helper.cursor.byteOffset, is);
                             }
                         }
                         else
                         {
-                            read(property, (helper.data->buffer.data() + helper.cursor.byteOffset), helper.cursor.byteOffset, is);
+                            read(property, (helper.data->buffer + helper.cursor.byteOffset), helper.cursor.byteOffset, is);
                         }
                     }
                     else
@@ -601,7 +644,7 @@ std::shared_ptr<PlyData> PlyFile::request_properties_from_element(const std::str
 {
     return impl->request_properties_from_element(elementKey, propertyKeys);
 }
-void PlyFile::add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, std::vector<uint8_t> & source, const int listCount, const Type listType)
+void PlyFile::add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, std::vector<uint8_t> & source, const int listCount, const Type listType)
 {
-    return impl->add_properties_to_element(elementKey, propertyKeys, source, listCount, listType);
+    return impl->add_properties_to_element(elementKey, propertyKeys, type, source, listCount, listType);
 }

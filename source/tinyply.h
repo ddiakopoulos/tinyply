@@ -9,16 +9,10 @@
 #define tinyply_h
 
 #include <vector>
-#include <algorithm>
 #include <string>
 #include <stdint.h>
-#include <map>
-#include <iostream>
 #include <sstream>
-#include <type_traits>
 #include <memory>
-#include <functional>
-#include <cstring>
 
 namespace tinyply
 {
@@ -40,51 +34,19 @@ namespace tinyply
     {
         Type t;
         size_t count;
-        std::vector<uint8_t> buffer;
+        uint8_t * buffer;
     };
-
-    struct PropertyInfo 
-    { 
-        int stride; 
-        std::string str; 
-    };
-
-    static std::map<Type, PropertyInfo> PropertyTable
-    {
-        { Type::INT8,{ 1, "char" } },
-        { Type::UINT8,{ 1, "uchar" } },
-        { Type::INT16,{ 2, "short" } },
-        { Type::UINT16,{ 2, "ushort" } },
-        { Type::INT32,{ 4, "int" } },
-        { Type::UINT32,{ 4, "uint" } },
-        { Type::FLOAT32,{ 4, "float" } },
-        { Type::FLOAT64,{ 8, "double" } },
-        { Type::INVALID,{ 0, "INVALID" } }
-    };
-
-    inline Type property_type_from_string(const std::string & t)
-    {
-        if (t == "int8" || t == "char")             return Type::INT8;
-        else if (t == "uint8" || t == "uchar")      return Type::UINT8;
-        else if (t == "int16" || t == "short")      return Type::INT16;
-        else if (t == "uint16" || t == "ushort")    return Type::UINT16;
-        else if (t == "int32" || t == "int")        return Type::INT32;
-        else if (t == "uint32" || t == "uint")      return Type::UINT32;
-        else if (t == "float32" || t == "float")    return Type::FLOAT32;
-        else if (t == "float64" || t == "double")   return Type::FLOAT64;
-        return Type::INVALID;
-    }
 
 	struct PlyProperty
 	{
 		PlyProperty(std::istream & is);
-		PlyProperty(Type type, const std::string & _name) : propertyType(type), isList(false), name(_name) {}
-		PlyProperty(Type list_type, Type prop_type, const std::string & _name, int list_count) : listType(list_type), propertyType(prop_type), isList(true), name(_name), listCount(list_count) {}
+		PlyProperty(Type type, std::string & _name) : propertyType(type), name(_name) {}
+		PlyProperty(Type list_type, Type prop_type, std::string & _name, int list_count) : listType(list_type), propertyType(prop_type), isList(true), name(_name), listCount(list_count) {}
         std::string name;
-        Type listType;
         Type propertyType;
-		bool isList;
-        int listCount;
+        bool isList{ false };
+        Type listType{ Type::INVALID };
+        int listCount{ 0 };
 	};
 
 	struct PlyElement
@@ -115,7 +77,7 @@ namespace tinyply
         std::vector<std::string> get_info() const;
 
         std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
-        void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, std::vector<uint8_t> & source, const int listCount = 1, const Type listType = Type::INVALID);
+        void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, std::vector<uint8_t> & source, const int listCount, const Type listType);
 	};
 
 } // namesapce tinyply

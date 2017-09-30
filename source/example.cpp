@@ -135,7 +135,6 @@ void read_ply_file(const std::string & filename)
             throw std::runtime_error("failed to open " + filename);
         }
 
-		// Parse the ASCII header fields
         PlyFile file;
 
         file.parse_header(ss);
@@ -149,7 +148,7 @@ void read_ply_file(const std::string & filename)
 			std::cout << "element - " << e.name << " (" << e.size << ")" << std::endl;
 			for (auto p : e.properties)
 			{
-				std::cout << "\tproperty - " << p.name << " (" << PropertyTable[p.propertyType].str << ")" << std::endl;
+				std::cout << "\tproperty - " << p.name << " (" << (int) p.propertyType << ")" << std::endl;
 			}
 		}
 
@@ -203,6 +202,6 @@ void read_ply_file(const std::string & filename)
 int main(int argc, char *argv[])
 {
 	//write_ply_example("example_tetrahedron.ply");
-	read_ply_file("../assets/icosahedron_ascii.ply");
+	read_ply_file("../assets/dragon_vrip.ply");
 	return 0;
 }
