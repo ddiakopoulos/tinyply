@@ -1,7 +1,6 @@
 // This software is in the public domain. Where that dedication is not
 // recognized, you are granted a perpetual, irrevocable license to copy,
 // distribute, and modify this file as you see fit.
-
 // Authored in 2015 by Dimitri Diakopoulos (http://www.dimitridiakopoulos.com)
 // https://github.com/ddiakopoulos/tinyply
 
@@ -13,6 +12,7 @@
 #include <stdint.h>
 #include <sstream>
 #include <memory>
+#include <map>
 
 namespace tinyply
 {
@@ -30,11 +30,42 @@ namespace tinyply
         FLOAT64
     };
 
+    struct PropertyInfo
+    {
+        int stride;
+        std::string str;
+    };
+
+    static std::map<Type, PropertyInfo> PropertyTable
+    {
+        { Type::INT8,{ 1, "char" } },
+        { Type::UINT8,{ 1, "uchar" } },
+        { Type::INT16,{ 2, "short" } },
+        { Type::UINT16,{ 2, "ushort" } },
+        { Type::INT32,{ 4, "int" } },
+        { Type::UINT32,{ 4, "uint" } },
+        { Type::FLOAT32,{ 4, "float" } },
+        { Type::FLOAT64,{ 8, "double" } },
+        { Type::INVALID,{ 0, "INVALID" } }
+    };
+
+    class Buffer
+    {
+        uint8_t * alias{ nullptr };
+        struct delete_array { void operator()(uint8_t * p) { delete[] p; } };
+        std::unique_ptr<uint8_t, decltype(Buffer::delete_array())> data;
+    public:
+        Buffer() {};
+        Buffer(const size_t size) : data(new uint8_t[size], delete_array()) { alias = data.get(); }
+        Buffer(uint8_t * ptr) { alias = data.get(); }
+        uint8_t * get() { return alias; }
+    };
+
     struct PlyData
     {
         Type t;
         size_t count;
-        uint8_t * buffer;
+        Buffer buffer;
     };
 
 	struct PlyProperty
@@ -77,7 +108,7 @@ namespace tinyply
         std::vector<std::string> get_info() const;
 
         std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
-        void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, std::vector<uint8_t> & source, const int listCount, const Type listType);
+        void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount);
 	};
 
 } // namesapce tinyply

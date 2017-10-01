@@ -148,7 +148,7 @@ void read_ply_file(const std::string & filename)
 			std::cout << "element - " << e.name << " (" << e.size << ")" << std::endl;
 			for (auto p : e.properties)
 			{
-				std::cout << "\tproperty - " << p.name << " (" << (int) p.propertyType << ")" << std::endl;
+				std::cout << "\tproperty - " << p.name << " (" << tinyply::PropertyTable[p.propertyType].str << ")" << std::endl;
 			}
 		}
 
@@ -156,6 +156,9 @@ void read_ply_file(const std::string & filename)
 
         std::shared_ptr<PlyData> vertices, normals, colors, faces, texcoords;
 
+        // The header information can be used to programmatically extract properties on elements
+        // known to exist in the file prior to reading the data. For brevity of the sample, properties 
+        // like vertex position are hard-coded below
         try { vertices = file.request_properties_from_element("vertex", { "x", "y", "z" }); }
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
@@ -177,22 +180,20 @@ void read_ply_file(const std::string & filename)
 
 		// Good place to put a breakpoint!
 		std::cout << "Parsing took " << difference_millis(before, after) << " ms: " << std::endl;
-		if (vertices) std::cout << "\tRead " << vertices->count << " total vertices (" << vertices->buffer.size() << " individual properties)." << std::endl;
-        if (normals) std::cout << "\tRead " << normals->count << " total vertex normals (" << normals->buffer.size() << " individual properties)." << std::endl;
-        if (colors) std::cout << "\tRead " << colors->count << " total vertex colors (" << colors->buffer.size() << " individual properties)." << std::endl;
-        if (faces) std::cout << "\tRead " << faces->count << " total faces (triangles) (" << faces->buffer.size() << " individual properties)." << std::endl;
-        if (texcoords) std::cout << "\tRead " << texcoords->count << " total texcoords (" << texcoords->buffer.size() << " individual properties)." << std::endl;
+		if (vertices) std::cout << "\tRead " << vertices->count << " total vertices "<< std::endl;
+        if (normals) std::cout << "\tRead " << normals->count << " total vertex normals " << std::endl;
+        if (colors) std::cout << "\tRead " << colors->count << " total vertex colors "<< std::endl;
+        if (faces) std::cout << "\tRead " << faces->count << " total faces (triangles) " << std::endl;
+        if (texcoords) std::cout << "\tRead " << texcoords->count << " total texcoords " << std::endl;
 
-        /*
-        for (size_t i = 0; i < vertices->data.size(); i+=12)
+        const size_t numVerticesBytes = vertices->count * tinyply::PropertyTable[vertices->t].stride;
+        for (size_t i = 0; i < numVerticesBytes; i+=12)
         {
-            std::cout << "1 " << *reinterpret_cast<float*>(&vertices->data[i + 0]) << std::endl;
-            std::cout << "2 " << *reinterpret_cast<float*>(&vertices->data[i + 4]) << std::endl;
-            std::cout << "3 " << *reinterpret_cast<float*>(&vertices->data[i + 8]) << std::endl;
+            std::cout << "1 " << *reinterpret_cast<float*>(&vertices->buffer.get()[i + 0]) << std::endl;
+            std::cout << "2 " << *reinterpret_cast<float*>(&vertices->buffer.get()[i + 4]) << std::endl;
+            std::cout << "3 " << *reinterpret_cast<float*>(&vertices->buffer.get()[i + 8]) << std::endl;
         }
-        */
 	}
-
 	catch (const std::exception & e)
 	{
 		std::cerr << "Caught tinyply exception: " << e.what() << std::endl;
@@ -202,6 +203,6 @@ void read_ply_file(const std::string & filename)
 int main(int argc, char *argv[])
 {
 	//write_ply_example("example_tetrahedron.ply");
-	read_ply_file("../assets/dragon_vrip.ply");
+	read_ply_file("../assets/bunny.ply");
 	return 0;
 }
