@@ -29,7 +29,7 @@ inline double difference_millis(timepoint start, timepoint end)
 	return (double)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 }
 
-/*
+
 void write_ply_example(const std::string & filename)
 {
 	std::vector<float> verts;
@@ -41,61 +41,71 @@ void write_ply_example(const std::string & filename)
 
 	// Per-vertex elements
 	verts = {
-		0.f, -100.462f, -142.5f,
-		123.409f, -100.462f, 71.25f,
-		0.f, 100.462f, 0.f,
-		-123.409f, -100.462f, 71.25f,
-		0.f, -100.462f, -142.5f,
-		0.f, -100.462f, -142.5f,
-		123.409f, -100.462f, 71.25f,
-		123.409f, -100.462f, 71.25f,
-		0.f, 100.462f, 0.f,
-		0.f, 100.462f, 0.f,
-		-123.409f, -100.462f, 71.25f,
-		-123.409f, -100.462f, 71.25f
+		0.f, 1.f, 2.f,
+		3.f, 4.f, 5.f,
+        6.f, 7.f, 8.f,
+        9.f, 10.f, 11.f,
+        12.f, 13.f, 14.f,
+        15.f, 16.f, 17.f,
+        18.f, 19.f, 20.f,
+        21.f, 22.f, 23.f,
+        24.f, 25.f, 26.f,
+        27.f, 28.f, 29.f,
+        30.f, 31.f, 32.f,
+        33.f, 34.f, 35.f,
 	};
 
 	norms = {
-		0.853811f, 0.349609f, -0.492948f,
-		0.853811f, 0.349609f, -0.492948f,
-		0.0f, 0.350761f, 0.989145f,
-		0.0f, 0.349609f, 0.985896f,
-		-0.853811f, 0.349609f, -0.492948f,
-		0.0f, -1.0472f, 0.0f,
-		0.0f, 0.349609f, 0.985896f,
-		0.0f, -1.0472f, 0.0f,
-		0.856624f, 0.350761f, -0.494572f,
-		-0.856624f, 0.350761f, -0.494572f,
-		-0.853811f, 0.349609f, -0.492948f,
-		0.0f, -1.0472f, 0.0f
+        0.5f, 1.5f, 2.5f,
+        3.5f, 4.5f, 5.5f,
+        6.5f, 7.5f, 8.5f,
+        9.5f, 10.5f, 11.5f,
+        12.5f, 13.5f, 14.5f,
+        15.5f, 16.5f, 17.5f,
+        18.5f, 19.5f, 20.5f,
+        21.5f, 22.5f, 23.5f,
+        24.5f, 25.5f, 26.5f,
+        27.5f, 28.5f, 29.5f,
+        30.5f, 31.5f, 32.5f,
+        33.5f, 34.5f, 35.5f,
 	};
 
 	colors = {
-		192, 192, 192, 255,
-		192, 192, 192, 255,
-		192, 192, 192, 255,
-		192, 192, 192, 255,
-		192, 192, 192, 255,
-		192, 192, 192, 255,
-		192, 192, 192, 255,
-		192, 192, 192, 255,
-		192, 192, 192, 255,
-		192, 192, 192, 255,
-		192, 193, 194, 255,
-		195, 196, 197, 255
+		10, 20, 30, 244,
+		15, 25, 35, 245,
+		20, 30, 40, 246,
+		25, 35, 45, 247,
+		30, 40, 50, 248,
+		35, 45, 55, 249,
+		40, 50, 60, 250,
+		45, 55, 65, 251,
+		50, 60, 70, 252,
+		55, 65, 75, 253,
+		60, 70, 80, 254,
+		65, 75, 85, 255
 	};
 
 	// Per-face elements
-	vertexIndicies = { 6, 2, 3, 0, 8, 1, 10, 9, 4, 5, 7, 11 };
+	vertexIndicies = { 
+        0, 1, 2, 
+        3, 4, 5, 
+        6, 7, 8, 
+        9, 10, 11 
+    };
+
 	faceTexcoords = {
-		0.199362f, 0.679351f, 0.399522f, 
-		0.333583f, 0.599682f, 0.679351f,
-		0.000000f, 0.332206f, 0.399522f,
-		0.333583f, 0.199362f, 0.679351f, 
-		0.599682f, 0.679351f, 0.399522f,
-		0.333583f, 0.799044f, 0.332206f, 
-		0.799044f, 0.332206f, 1.000000f,
-		0.678432f, 0.599682f, 0.679351f 
+		0.25f, 0.55f, 
+        0.26f, 0.56f,
+        0.27f, 0.57f,
+		0.28f, 0.58f, 
+        0.29f, 0.59f, 
+        0.30f, 0.60f, 
+        0.31f, 0.61f, 
+        0.32f, 0.62f,
+        0.33f, 0.63f, 
+		0.34f, 0.64f,
+        0.35f, 0.65f, 
+        0.36f, 0.66f 
 	};
 
 	// Tinyply does not perform any file i/o internally
@@ -103,27 +113,32 @@ void write_ply_example(const std::string & filename)
 	fb.open(filename, std::ios::out | std::ios::binary);
 	std::ostream outputStream(&fb);
 
-	PlyFile myFile;
+    PlyFile exampleOutFile;
 
-	myFile.add_properties_to_element("vertex", { "x", "y", "z" }, verts);
-	myFile.add_properties_to_element("vertex", { "nx", "ny", "nz" }, norms);
-	myFile.add_properties_to_element("vertex", { "red", "green", "blue", "alpha" }, colors);
+    exampleOutFile.add_properties_to_element("vertex", { "x", "y", "z" }, Type::FLOAT32, verts.size(), reinterpret_cast<uint8_t*>(verts.data()), Type::INVALID, 0);
+    exampleOutFile.add_properties_to_element("vertex", { "nx", "ny", "nz" }, Type::FLOAT32, verts.size(), reinterpret_cast<uint8_t*>(norms.data()), Type::INVALID, 0);
+    exampleOutFile.add_properties_to_element("vertex", { "red", "green", "blue", "alpha" }, Type::UINT8, verts.size(), reinterpret_cast<uint8_t*>(colors.data()), Type::INVALID, 0);
+
+    exampleOutFile.add_properties_to_element("face", { "vertex_indices" }, Type::UINT32, vertexIndicies.size(), reinterpret_cast<uint8_t*>(vertexIndicies.data()), Type::UINT16, 3);
+    exampleOutFile.add_properties_to_element("face", { "texcoord" }, Type::FLOAT32, faceTexcoords.size(), reinterpret_cast<uint8_t*>(faceTexcoords.data()), Type::UINT16, 6);
+
+	//myFile.add_properties_to_element("vertex", { "x", "y", "z" }, verts);
+	//myFile.add_properties_to_element("vertex", { "nx", "ny", "nz" }, norms);
+	//myFile.add_properties_to_element("vertex", { "red", "green", "blue", "alpha" }, colors);
 
 	// List property types must also be created with a count and type of the list (data property type
 	// is automatically inferred from the type of the vector argument). 
-	myFile.add_properties_to_element("face", { "vertex_indices" }, vertexIndicies, 3, PlyProperty::Type::UINT8);
-	myFile.add_properties_to_element("face", { "texcoord" }, faceTexcoords, 6, PlyProperty::Type::UINT8);
+	//myFile.add_properties_to_element("face", { "vertex_indices" }, vertexIndicies, 3, PlyProperty::Type::UINT8);
+	//myFile.add_properties_to_element("face", { "texcoord" }, faceTexcoords, 6, PlyProperty::Type::UINT8);
 
-	myFile.comments.push_back("generated by tinyply");
-	myFile.write(outputStream, true);
+	//myFile.comments.push_back("generated by tinyply");
+    exampleOutFile.write(outputStream, false);
 
 	fb.close();
 }
-*/
 
 void read_ply_file(const std::string & filename)
 {
-	// Tinyply can and will throw exceptions at you!
 	try
 	{
 		// Read the file and create a std::istringstream suitable
@@ -157,8 +172,8 @@ void read_ply_file(const std::string & filename)
         std::shared_ptr<PlyData> vertices, normals, colors, faces, texcoords;
 
         // The header information can be used to programmatically extract properties on elements
-        // known to exist in the file prior to reading the data. For brevity of the sample, properties 
-        // like vertex position are hard-coded below
+        // known to exist in the file prior to reading the data. For brevity of this sample, properties 
+        // like vertex position are hard-coded: 
         try { vertices = file.request_properties_from_element("vertex", { "x", "y", "z" }); }
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
@@ -186,6 +201,7 @@ void read_ply_file(const std::string & filename)
         if (faces) std::cout << "\tRead " << faces->count << " total faces (triangles) " << std::endl;
         if (texcoords) std::cout << "\tRead " << texcoords->count << " total texcoords " << std::endl;
 
+        /*
         const size_t numVerticesBytes = vertices->count * tinyply::PropertyTable[vertices->t].stride;
         for (size_t i = 0; i < numVerticesBytes; i+=12)
         {
@@ -193,6 +209,7 @@ void read_ply_file(const std::string & filename)
             std::cout << "2 " << *reinterpret_cast<float*>(&vertices->buffer.get()[i + 4]) << std::endl;
             std::cout << "3 " << *reinterpret_cast<float*>(&vertices->buffer.get()[i + 8]) << std::endl;
         }
+        */
 	}
 	catch (const std::exception & e)
 	{
@@ -202,7 +219,7 @@ void read_ply_file(const std::string & filename)
 
 int main(int argc, char *argv[])
 {
-	//write_ply_example("example_tetrahedron.ply");
-	read_ply_file("../assets/bunny.ply");
+	write_ply_example("../assets/example_junk.ply");
+	read_ply_file("../assets/example_junk.ply");
 	return 0;
 }

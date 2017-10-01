@@ -57,7 +57,7 @@ namespace tinyply
     public:
         Buffer() {};
         Buffer(const size_t size) : data(new uint8_t[size], delete_array()) { alias = data.get(); }
-        Buffer(uint8_t * ptr) { alias = data.get(); }
+        Buffer(uint8_t * ptr) { alias = ptr; }
         uint8_t * get() { return alias; }
     };
 

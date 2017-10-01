@@ -506,9 +506,12 @@ void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & element
 {
     ParsingHelper helper;
     helper.data = std::make_shared<PlyData>();
+    helper.data->count = count;
+    helper.data->t = type;
+    helper.data->buffer = Buffer(data);
     helper.cursor.byteOffset = 0;
     helper.cursor.totalSizeBytes = 0;
-    helper.data->buffer = Buffer(data);
+
 
     auto create_property_on_element = [&](PlyElement & e)
     {
@@ -528,7 +531,7 @@ void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & element
     }
     else
     {
-        PlyElement newElement = (listCount == 1) ? PlyElement(elementKey, count / propertyKeys.size()) : PlyElement(elementKey, count / listCount);
+        PlyElement newElement = (listType == Type::INVALID) ? PlyElement(elementKey, count / propertyKeys.size()) : PlyElement(elementKey, count / listCount);
         create_property_on_element(newElement);
         elements.push_back(newElement);
     }
