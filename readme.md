@@ -1,5 +1,7 @@
 # tinyply
 
+New or existing user? Please review the 2.0 branch which contains a considerable API cleanup + rewrite.
+
 A two-file, zero-dependency (except the C++ STL) public domain implementation of the PLY mesh file format. An overview and definition of the file format is available [here](http://paulbourke.net/dataformats/ply/). This format is often used in the computer vision community for its relative simplicity and ability to support arbitrary mesh attributes and layouts.
 
 The library is written in C++11 and requires a recent compiler (GCC 4.8+ / VS2013+ / Clang 2.9+). Tinyply supports exporting and importing PLY files in both binary and ascii formats. Recently, `tinyply` was modified to support filesizes >= 4gb and read big-endian binary formats. The library does not directly perform file i/o for either reading or writing.
