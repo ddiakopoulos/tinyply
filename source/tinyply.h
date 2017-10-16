@@ -197,7 +197,7 @@ namespace tinyply
 		{
 			if (list[i].name == key)
 			{
-				return i;
+                return int(i);
 			}
 		}
 		return -1;
@@ -287,7 +287,7 @@ namespace tinyply
 
 			for (auto key : propertyKeys)
 			{
-				if (int instanceCount = instance_counter(elementKey, key))
+                if (size_t instanceCount = instance_counter(elementKey, key))
 				{
 					instanceCounts.push_back(instanceCount);
 					auto result = userDataTable.insert(std::pair<std::string, std::shared_ptr<DataCursor>>(make_key(elementKey, key), cursor));
@@ -377,7 +377,7 @@ namespace tinyply
 		std::vector<std::string> requestedElements;
 	};
 
-} // namesapce tinyply
+} // namespace tinyply
 
 #endif // tinyply_h
 
