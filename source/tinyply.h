@@ -111,6 +111,6 @@ namespace tinyply
         void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount);
 	};
 
-} // namesapce tinyply
+} // namespace tinyply
 
 #endif // tinyply_h
