@@ -9,6 +9,7 @@
 #include <functional>
 #include <type_traits>
 #include <iostream>
+#include <cstring>
 
 using namespace tinyply;
 using namespace std;
@@ -516,7 +517,7 @@ void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & element
         for (auto key : propertyKeys)
         {
             PlyProperty newProp = (listType == Type::INVALID) ? PlyProperty(type, key) : PlyProperty(listType, type, key, listCount);
-            auto result = userData.insert(std::pair<std::string, ParsingHelper>(make_key(elementKey, key), helper));
+            userData.insert(std::pair<std::string, ParsingHelper>(make_key(elementKey, key), helper));
             e.properties.push_back(newProp);
         }
     };
