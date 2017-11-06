@@ -9,6 +9,7 @@
 #include <functional>
 #include <type_traits>
 #include <iostream>
+#include <cstring>
 
 using namespace tinyply;
 using namespace std;
