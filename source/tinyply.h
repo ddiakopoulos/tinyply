@@ -107,7 +107,7 @@ namespace tinyply
         void write(std::ostream & os, bool isBinary);
 
         std::vector<PlyElement> get_elements() const;
-        std::vector<std::string> get_comments() const;
+        std::vector<std::string> & get_comments();
         std::vector<std::string> get_info() const;
 
         std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
