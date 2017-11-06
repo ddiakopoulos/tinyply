@@ -210,8 +210,8 @@ void PlyFile::PlyFileImpl::read_header_format(std::istream & is)
 {
     std::string s;
     (is >> s);
-	if (s == "binary_little_endian") isBinary = true;
-	else if (s == "binary_big_endian") isBinary = isBigEndian = true;
+    if (s == "binary_little_endian") isBinary = true;
+    else if (s == "binary_big_endian") isBinary = isBigEndian = true;
 }
 
 void PlyFile::PlyFileImpl::read_header_element(std::istream & is)
@@ -229,8 +229,8 @@ size_t PlyFile::PlyFileImpl::skip_property_binary(const PlyProperty & p, std::is
     static std::vector<char> skip(PropertyTable[p.propertyType].stride);
     if (p.isList)
     {
-		size_t listSize = 0;
-		size_t dummyCount = 0;
+        size_t listSize = 0;
+        size_t dummyCount = 0;
         read_property_binary(p.listType, &listSize, dummyCount, is);
         for (size_t i = 0; i < listSize; ++i) is.read(skip.data(), PropertyTable[p.propertyType].stride);
         return listSize * PropertyTable[p.propertyType].stride; // in bytes
@@ -376,7 +376,7 @@ void PlyFile::PlyFileImpl::write_binary_internal(std::ostream & os)
                 {
                     uint8_t listSize[4] = {0, 0, 0, 0};
                     std::memcpy(listSize, &p.listCount, sizeof(uint32_t));
-					size_t dummyCount = 0;
+                    size_t dummyCount = 0;
                     write_property_binary(p.listType, os, listSize, dummyCount);
                     for (int j = 0; j < p.listCount; ++j)
                     {

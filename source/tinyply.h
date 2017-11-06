@@ -68,29 +68,29 @@ namespace tinyply
         Buffer buffer;
     };
 
-	struct PlyProperty
-	{
-		PlyProperty(std::istream & is);
-		PlyProperty(Type type, std::string & _name) : propertyType(type), name(_name) {}
-		PlyProperty(Type list_type, Type prop_type, std::string & _name, int list_count) : listType(list_type), propertyType(prop_type), isList(true), name(_name), listCount(list_count) {}
+    struct PlyProperty
+    {
+        PlyProperty(std::istream & is);
+        PlyProperty(Type type, std::string & _name) : propertyType(type), name(_name) {}
+        PlyProperty(Type list_type, Type prop_type, std::string & _name, int list_count) : listType(list_type), propertyType(prop_type), isList(true), name(_name), listCount(list_count) {}
         std::string name;
         Type propertyType;
         bool isList{ false };
         Type listType{ Type::INVALID };
         int listCount{ 0 };
-	};
+    };
 
-	struct PlyElement
-	{
-		PlyElement(std::istream & istream);
-		PlyElement(const std::string & _name, size_t count) : name(_name), size(count) {}
-		std::string name;
-		size_t size;
-		std::vector<PlyProperty> properties;
-	};
+    struct PlyElement
+    {
+        PlyElement(std::istream & istream);
+        PlyElement(const std::string & _name, size_t count) : name(_name), size(count) {}
+        std::string name;
+        size_t size;
+        std::vector<PlyProperty> properties;
+    };
 
-	struct PlyFile
-	{
+    struct PlyFile
+    {
         struct PlyFileImpl;
         std::unique_ptr<PlyFileImpl> impl;
 
@@ -99,9 +99,9 @@ namespace tinyply
 
         bool parse_header(std::istream & is);
 
-		void read(std::istream & is);
+        void read(std::istream & is);
 
-		void write(std::ostream & os, bool isBinary);
+        void write(std::ostream & os, bool isBinary);
 
         std::vector<PlyElement> get_elements() const;
         std::vector<std::string> get_comments() const;
@@ -109,7 +109,7 @@ namespace tinyply
 
         std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
         void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount);
-	};
+    };
 
 } // namesapce tinyply
 
