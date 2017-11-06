@@ -3,6 +3,7 @@
 // distribute, and modify this file as you see fit.
 // Authored in 2015 by Dimitri Diakopoulos (http://www.dimitridiakopoulos.com)
 // https://github.com/ddiakopoulos/tinyply
+// Version 2.0
 
 #ifndef tinyply_h
 #define tinyply_h
