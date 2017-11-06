@@ -55,11 +55,13 @@ namespace tinyply
         uint8_t * alias{ nullptr };
         struct delete_array { void operator()(uint8_t * p) { delete[] p; } };
         std::unique_ptr<uint8_t, decltype(Buffer::delete_array())> data;
+        size_t size;
     public:
         Buffer() {};
-        Buffer(const size_t size) : data(new uint8_t[size], delete_array()) { alias = data.get(); }
-        Buffer(uint8_t * ptr) { alias = ptr; }
+        Buffer(const size_t size) : size(size), data(new uint8_t[size], delete_array()) { alias = data.get(); } // allocating
+        Buffer(uint8_t * ptr) { alias = ptr; } // non-allocating, fixme: set size?
         uint8_t * get() { return alias; }
+        size_t size_bytes() const { return size; }
     };
 
     struct PlyData

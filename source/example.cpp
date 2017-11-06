@@ -200,15 +200,16 @@ void read_ply_file(const std::string & filename)
         if (faces) std::cout << "\tRead " << faces->count << " total faces (triangles) " << std::endl;
         if (texcoords) std::cout << "\tRead " << texcoords->count << " total texcoords " << std::endl;
 
-        /* Print out data for debugging
+        // Print out data for debugging
         const size_t numVerticesBytes = 3 * vertices->count * tinyply::PropertyTable[vertices->t].stride;
+        std::cout << vertices->buffer.size_bytes() << std::endl;
         for (size_t i = 0; i < numVerticesBytes; i+=12)
         {
             std::cout << "1 " << *reinterpret_cast<float*>(&vertices->buffer.get()[i + 0]) << std::endl;
             std::cout << "2 " << *reinterpret_cast<float*>(&vertices->buffer.get()[i + 4]) << std::endl;
             std::cout << "3 " << *reinterpret_cast<float*>(&vertices->buffer.get()[i + 8]) << std::endl;
         }
-        */
+
     }
     catch (const std::exception & e)
     {
