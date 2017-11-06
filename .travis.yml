@@ -24,4 +24,5 @@ install:
   - ${CXX} -v
 
 script: 
+  cd source;
   make;
