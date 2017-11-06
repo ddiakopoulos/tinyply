@@ -29,7 +29,6 @@ inline double difference_millis(timepoint start, timepoint end)
     return (double)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 }
 
-
 void write_ply_example(const std::string & filename)
 {
     std::vector<float> verts;
@@ -201,6 +200,7 @@ void read_ply_file(const std::string & filename)
         if (faces) std::cout << "\tRead " << faces->count << " total faces (triangles) " << std::endl;
         if (texcoords) std::cout << "\tRead " << texcoords->count << " total texcoords " << std::endl;
 
+        /* Print out data for debugging
         const size_t numVerticesBytes = 3 * vertices->count * tinyply::PropertyTable[vertices->t].stride;
         for (size_t i = 0; i < numVerticesBytes; i+=12)
         {
@@ -208,6 +208,7 @@ void read_ply_file(const std::string & filename)
             std::cout << "2 " << *reinterpret_cast<float*>(&vertices->buffer.get()[i + 4]) << std::endl;
             std::cout << "3 " << *reinterpret_cast<float*>(&vertices->buffer.get()[i + 8]) << std::endl;
         }
+        */
     }
     catch (const std::exception & e)
     {
@@ -217,7 +218,7 @@ void read_ply_file(const std::string & filename)
 
 int main(int argc, char *argv[])
 {
-    //write_ply_example("../assets/example_junk.ply");
-    read_ply_file("../assets/example_junk.ply");
+    write_ply_example("example_junk.ply");
+    read_ply_file("example_junk.ply");
     return 0;
 }
