@@ -223,6 +223,7 @@ void PlyFile::PlyFileImpl::read_header_element(std::istream & is)
 
 void PlyFile::PlyFileImpl::read_header_property(std::istream & is)
 {
+    if (!elements.size()) throw std::runtime_error("no elements defined; file is malformed");
     elements.back().properties.emplace_back(is);
 }
 
