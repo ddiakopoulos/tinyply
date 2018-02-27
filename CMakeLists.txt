@@ -11,7 +11,12 @@ set(PROJECT_VERSION 2.0)
 include_directories("${CMAKE_SOURCE_DIR}/source")
 
 # Library
-add_library(tinyply source/tinyply.cpp)
+set( SHARED_LIB false CACHE BOOL "Wether to build as shared library")
+if(${SHARED_LIB})
+    add_library(tinyply SHARED source/tinyply.cpp)
+else()
+    add_library(tinyply STATIC source/tinyply.cpp)
+endif()
 
 # Example
 add_executable(example source/example.cpp)
@@ -46,6 +51,7 @@ configure_package_config_file(
 
 # Install
 install(TARGETS tinyply EXPORT ${targets_export_name}
+        RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib)
 install(FILES source/tinyply.h
