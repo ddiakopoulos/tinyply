@@ -13,11 +13,10 @@ include_directories("${CMAKE_SOURCE_DIR}/source")
 # Library
 set( SHARED_LIB false CACHE BOOL "Wether to build as shared library")
 if(${SHARED_LIB})
-    include(GenerateExportHeader)
-    add_library(tinyply SHARED source/tinyply.cpp)
-    generate_export_header(tinyply)
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    add_library(tinyply SHARED source/tinyply.cpp source/tinyply.h)
 else()
-    add_library(tinyply STATIC source/tinyply.cpp)
+    add_library(tinyply STATIC source/tinyply.cpp source/tinyply.h)
 endif()
 
 # Example
