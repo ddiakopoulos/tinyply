@@ -10,6 +10,8 @@ set(PROJECT_VERSION 2.0)
 
 include_directories("${CMAKE_SOURCE_DIR}/source")
 
+set(CMAKE_DEBUG_POSTFIX "d")
+
 # Library
 set( SHARED_LIB false CACHE BOOL "Wether to build as shared library")
 if(${SHARED_LIB})
