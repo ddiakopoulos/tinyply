@@ -68,7 +68,7 @@ struct PlyFile::PlyFileImpl
     {
         std::shared_ptr<PlyData> data;
         std::shared_ptr<PlyCursor> cursor;
-        std::vector<uint32_t> listIndices;
+        std::shared_ptr<std::vector<uint32_t>> listIndices;
     };
 
     std::map<std::string, ParsingHelper> userData;
@@ -82,7 +82,7 @@ struct PlyFile::PlyFileImpl
     void read(std::istream & is);
     void write(std::ostream & os, bool isBinary);
 
-    std::shared_ptr<Result> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
+    Result request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
     void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount);
 
     size_t read_property_binary(const Type t, void * dest, size_t & destOffset, std::istream & is);
@@ -359,7 +359,7 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
     // Debugging Only
     for (auto & d : userData)
     {
-        std::cout << "Name: " << d.first << ", " << d.second.listIndices.size() << std::endl;
+        std::cout << "Name: " << d.first << ", " << d.second.listIndices.get()->size() << std::endl;
     }
 }
 
@@ -461,13 +461,17 @@ void PlyFile::PlyFileImpl::write_header(std::ostream & os)
 }
 
 // Returns the size (in bytes)
-std::shared_ptr<Result> PlyFile::PlyFileImpl::request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys)
+Result PlyFile::PlyFileImpl::request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys)
 {
     // All requested properties in the userDataTable share the same cursor (thrown into the same flat array)
     ParsingHelper helper;
+
     helper.data = std::make_shared<PlyData>();
     helper.data->count = 0;
     helper.data->t = Type::INVALID;
+
+    helper.listIndices = std::make_shared<std::vector<uint32_t>>();
+
     helper.cursor = std::make_shared<PlyCursor>();
     helper.cursor->byteOffset = 0;
     helper.cursor->totalSizeBytes = 0;
@@ -506,7 +510,10 @@ std::shared_ptr<Result> PlyFile::PlyFileImpl::request_properties_from_element(co
     }
     else throw std::invalid_argument("the element key was not found in the header: " + elementKey);
 
-    return helper.data; // and data aux
+    Result r;
+    r.buffer = helper.data;
+    r.index_list = helper.listIndices;
+    return r;
 }
 
 void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount)
@@ -599,7 +606,7 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
                         if (listSize > 0)
                         {
                             //std::cout << "- " << property.name << ", " << listSize << std::endl;
-                            helper.listIndices.push_back(listSize);
+                            helper.listIndices.get()->push_back(listSize);
                         }
                     }
                 }
@@ -628,7 +635,7 @@ void PlyFile::write(std::ostream & os, bool isBinary) { return impl->write(os, i
 std::vector<PlyElement> PlyFile::get_elements() const { return impl->elements; }
 std::vector<std::string> & PlyFile::get_comments() { return impl->comments; }
 std::vector<std::string> PlyFile::get_info() const { return impl->objInfo; }
-std::shared_ptr<Result> PlyFile::request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys)
+Result PlyFile::request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys)
 {
     return impl->request_properties_from_element(elementKey, propertyKeys);
 }

@@ -73,8 +73,8 @@ namespace tinyply
 
     struct Result
     {
-        PlyData buffer;
-        PlyData index_list;
+        std::shared_ptr<PlyData> buffer;
+        std::shared_ptr<std::vector<uint32_t>> index_list;
     };
 
     struct PlyProperty
@@ -107,16 +107,14 @@ namespace tinyply
         ~PlyFile();
 
         bool parse_header(std::istream & is);
-
         void read(std::istream & is);
-
         void write(std::ostream & os, bool isBinary);
 
         std::vector<PlyElement> get_elements() const;
         std::vector<std::string> & get_comments();
         std::vector<std::string> get_info() const;
 
-        std::shared_ptr<Result> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
+        Result request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
         void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount);
     };
 

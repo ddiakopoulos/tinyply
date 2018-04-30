@@ -162,7 +162,7 @@ void read_ply_file(const std::string & filename)
 
         // Tinyply 2.0 treats incoming data as untyped byte buffers. It's now
         // up to users to treat this data as they wish. See below for examples.
-        std::shared_ptr<PlyData> vertices, normals, colors, faces, texcoords;
+        Result vertices, normals, colors, faces, texcoords;
 
         // The header information can be used to programmatically extract properties on elements
         // known to exist in the file header prior to reading the data. For brevity of this sample, properties 
@@ -188,31 +188,31 @@ void read_ply_file(const std::string & filename)
 
         // Good place to put a breakpoint!
         std::cout << "Parsing took " << difference_millis(before, after) << " ms: " << std::endl;
-        if (vertices) std::cout << "\tRead " << vertices->count << " total vertices "<< std::endl;
-        if (normals) std::cout << "\tRead " << normals->count << " total vertex normals " << std::endl;
-        if (colors) std::cout << "\tRead " << colors->count << " total vertex colors "<< std::endl;
-        if (faces) std::cout << "\tRead " << faces->count << " total faces (triangles) " << std::endl;
-        if (texcoords) std::cout << "\tRead " << texcoords->count << " total texcoords " << std::endl;
+        if (vertices.buffer) std::cout << "\tRead " << vertices.buffer->count << " total vertices "<< std::endl;
+        if (normals.buffer) std::cout << "\tRead " << normals.buffer->count << " total vertex normals " << std::endl;
+        if (colors.buffer) std::cout << "\tRead " << colors.buffer->count << " total vertex colors "<< std::endl;
+        if (faces.buffer) std::cout << "\tRead " << faces.buffer->count << " total faces (triangles) " << std::endl;
+        if (texcoords.buffer) std::cout << "\tRead " << texcoords.buffer->count << " total texcoords " << std::endl;
 
         // Example: type 'conversion' to your own native types - Option A
         {
-            const size_t numVerticesBytes = vertices->buffer.size_bytes();
+            const size_t numVerticesBytes = vertices.buffer->buffer.size_bytes();
             struct float3 { float x, y, z; };
-            std::vector<float3> verts(vertices->count);
-            std::memcpy(verts.data(), vertices->buffer.get(), numVerticesBytes);
+            std::vector<float3> verts(vertices.buffer->count);
+            std::memcpy(verts.data(), vertices.buffer->buffer.get(), numVerticesBytes);
         }
 
         // Example: type 'conversion' to your own native types - Option B
         {
-            const size_t numVerticesBytes = vertices->buffer.size_bytes();
+            const size_t numVerticesBytes = vertices.buffer->buffer.size_bytes();
             struct float3 { float x, y, z; };
             struct double3 { double x, y, z; };
 
             std::vector<float3> verts_floats;
             std::vector<double3> verts_doubles;
 
-            if (vertices->t == tinyply::Type::FLOAT32) { /* as floats ... */ }
-            if (vertices->t == tinyply::Type::FLOAT64) { /* as doubles ... */ }
+            if (vertices.buffer->t == tinyply::Type::FLOAT32) { /* as floats ... */ }
+            if (vertices.buffer->t == tinyply::Type::FLOAT64) { /* as doubles ... */ }
         }
     }
     catch (const std::exception & e)
