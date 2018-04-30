@@ -3,7 +3,7 @@
 // distribute, and modify this file as you see fit.
 // Authored in 2015 by Dimitri Diakopoulos (http://www.dimitridiakopoulos.com)
 // https://github.com/ddiakopoulos/tinyply
-// Version 2.0
+// Version 2.1
 
 #ifndef tinyply_h
 #define tinyply_h
@@ -71,6 +71,12 @@ namespace tinyply
         Buffer buffer;
     };
 
+    struct Result
+    {
+        PlyData buffer;
+        PlyData index_list;
+    };
+
     struct PlyProperty
     {
         PlyProperty(std::istream & is);
@@ -110,10 +116,10 @@ namespace tinyply
         std::vector<std::string> & get_comments();
         std::vector<std::string> get_info() const;
 
-        std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
+        std::shared_ptr<Result> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
         void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount);
     };
 
-} // namesapce tinyply
+} // namespace tinyply
 
 #endif // tinyply_h

@@ -223,7 +223,7 @@ void read_ply_file(const std::string & filename)
 
 int main(int argc, char *argv[])
 {
-    write_ply_example("example_junk.ply");
-    read_ply_file("example_junk.ply");
+    //write_ply_example("example_junk.ply");
+    read_ply_file("tet_ascii_variable.ply");
     return 0;
 }
