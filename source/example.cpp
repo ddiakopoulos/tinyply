@@ -214,6 +214,39 @@ void read_ply_file(const std::string & filename)
             if (vertices.buffer->t == tinyply::Type::FLOAT32) { /* as floats ... */ }
             if (vertices.buffer->t == tinyply::Type::FLOAT64) { /* as doubles ... */ }
         }
+
+        // Example: variable length lists
+        {
+            struct u3 { uint32_t x, y, z; };
+            struct u4 { uint32_t x, y, z, w; };
+
+            std::vector<u3> triangles;
+            std::vector<u4> quads;
+
+            std::cout << "Size Bytes: " << faces.buffer->buffer.size_bytes() << std::endl; // 112
+
+            size_t offset = 0;
+            for (auto & index_length : *faces.index_list)
+            {
+                std::cout << "Variable Index Length: " << index_length << std::endl;
+
+                if (index_length == 3)
+                {
+                    u3 tri;
+                    std::memcpy(&tri, faces.buffer->buffer.get() + offset, sizeof(u3));
+                    triangles.push_back(tri);
+                    offset += sizeof(u3);
+                }
+
+                if (index_length == 4)
+                {
+                    u4 quad;
+                    std::memcpy(&quad, faces.buffer->buffer.get() + offset, sizeof(u4));
+                    quads.push_back(quad);
+                    offset += sizeof(u4);
+                }
+            }
+        }
     }
     catch (const std::exception & e)
     {
