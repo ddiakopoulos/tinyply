@@ -287,7 +287,7 @@ size_t PlyFile::PlyFileImpl::read_property_binary(const Type t, void * dest, siz
 }
 
 size_t PlyFile::PlyFileImpl::read_property_ascii(const Type t, void * dest, size_t & destOffset, std::istream & is)
-{         
+{
     destOffset += PropertyTable[t].stride;
 
     switch (t)
@@ -343,7 +343,7 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
 
     // Not great, but since we sorted by ptrs on PlyData, need to remap back onto its cursor in the userData table
     for (auto & b : buffers)
-    {   
+    {
         for (auto & entry : userData)
         {
             if (entry.second.data == b && b->buffer.get() == nullptr)
@@ -519,7 +519,7 @@ void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & element
         for (auto key : propertyKeys)
         {
             PlyProperty newProp = (listType == Type::INVALID) ? PlyProperty(type, key) : PlyProperty(listType, type, key, listCount);
-            auto result = userData.insert(std::pair<std::string, ParsingHelper>(make_key(elementKey, key), helper));
+            /* auto result = */userData.insert(std::pair<std::string, ParsingHelper>(make_key(elementKey, key), helper));
             e.properties.push_back(newProp);
         }
     };
@@ -542,7 +542,7 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
 {
     std::function<size_t(const Type t, void * dest, size_t & destOffset, std::istream & is)> read;
     std::function<size_t(const PlyProperty & p, std::istream & is)> skip;
-    
+
     const auto start = is.tellg();
 
     if (isBinary)
