@@ -17,18 +17,15 @@
 
 using namespace tinyply;
 
-typedef std::chrono::time_point<std::chrono::high_resolution_clock> timepoint;
-std::chrono::high_resolution_clock c;
-
-inline std::chrono::time_point<std::chrono::high_resolution_clock> now()
+class manual_timer
 {
-    return c.now();
-}
-
-inline double difference_millis(timepoint start, timepoint end)
-{
-    return (double)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-}
+    std::chrono::high_resolution_clock::time_point t0;
+    double timestamp{ 0.f };
+public:
+    void start() { t0 = std::chrono::high_resolution_clock::now(); }
+    void stop() { timestamp = std::chrono::duration<float>(std::chrono::high_resolution_clock::now() - t0).count() * 1000; }
+    const double & get() { return timestamp; }
+};
 
 void write_ply_example(const std::string & filename)
 {
@@ -182,12 +179,15 @@ void read_ply_file(const std::string & filename)
         try { texcoords = file.request_properties_from_element("face", { "texcoord" }); }
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
-        timepoint before = now();
+        manual_timer read_timer;
+
+        read_timer.start();
         file.read(ss);
-        timepoint after = now();
+        read_timer.stop();
 
         // Good place to put a breakpoint!
-        std::cout << "Parsing took " << difference_millis(before, after) << " ms: " << std::endl;
+        std::cout << "Parsing took " << read_timer.get() / 1000.f << " seconds: " << std::endl;
+
         if (vertices) std::cout << "\tRead " << vertices->count << " total vertices "<< std::endl;
         if (normals) std::cout << "\tRead " << normals->count << " total vertex normals " << std::endl;
         if (colors) std::cout << "\tRead " << colors->count << " total vertex colors "<< std::endl;
