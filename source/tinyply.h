@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include <sstream>
 #include <memory>
-#include <map>
+#include <unordered_map>
 
 namespace tinyply
 {
@@ -37,7 +37,7 @@ namespace tinyply
         std::string str;
     };
 
-    static std::map<Type, PropertyInfo> PropertyTable
+    static std::unordered_map<Type, PropertyInfo> PropertyTable
     {
         { Type::INT8,{ 1, "char" } },
         { Type::UINT8,{ 1, "uchar" } },

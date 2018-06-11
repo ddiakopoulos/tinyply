@@ -11,7 +11,6 @@
 #include <type_traits>
 #include <iostream>
 #include <cstring>
-#include <unordered_map>
 
 using namespace tinyply;
 using namespace std;
@@ -93,6 +92,7 @@ struct PlyFile::PlyFileImpl
     std::vector<PlyElement> elements;
     std::vector<std::string> comments;
     std::vector<std::string> objInfo;
+    uint8_t scratch[128];
 
     void read(std::istream & is);
     void write(std::ostream & os, bool isBinary);
@@ -240,24 +240,27 @@ void PlyFile::PlyFileImpl::read_header_property(std::istream & is)
 
 size_t PlyFile::PlyFileImpl::skip_property_binary(const PlyProperty & p, std::istream & is)
 {
-    static std::vector<char> skip(PropertyTable[p.propertyType].stride);
+    const int32_t stride = PropertyTable[p.propertyType].stride;
+
     if (p.isList)
     {
         size_t listSize = 0;
         size_t dummyCount = 0;
         read_property_binary(p.listType, &listSize, dummyCount, is);
-        for (size_t i = 0; i < listSize; ++i) is.read(skip.data(), PropertyTable[p.propertyType].stride);
-        return listSize * PropertyTable[p.propertyType].stride; // in bytes
+        for (size_t i = 0; i < listSize; ++i) is.read((char*) scratch, stride);
+        return listSize * stride; // in bytes
     }
     else
     {
-        is.read(skip.data(), PropertyTable[p.propertyType].stride);
-        return PropertyTable[p.propertyType].stride;
+        is.read((char*)scratch, PropertyTable[p.propertyType].stride);
+        return stride;
     }
 }
 
 size_t PlyFile::PlyFileImpl::skip_property_ascii(const PlyProperty & p, std::istream & is)
 {
+    const int32_t stride = PropertyTable[p.propertyType].stride;
+
     std::string skip;
     if (p.isList)
     {
@@ -265,41 +268,41 @@ size_t PlyFile::PlyFileImpl::skip_property_ascii(const PlyProperty & p, std::ist
         size_t dummyCount = 0;
         read_property_ascii(p.listType, &listSize, dummyCount, is);
         for (size_t i = 0; i < listSize; ++i) is >> skip;
-        return listSize * PropertyTable[p.propertyType].stride; // in bytes
+        return listSize * stride; // in bytes
     }
     else
     {
         is >> skip;
-        return PropertyTable[p.propertyType].stride;
+        return stride;
     }
 }
 
 size_t PlyFile::PlyFileImpl::read_property_binary(const Type t, void * dest, size_t & destOffset, std::istream & is)
 {
-    destOffset += PropertyTable[t].stride;
-
-    std::vector<char> src(PropertyTable[t].stride);
-    is.read(src.data(), PropertyTable[t].stride);
+    const int32_t stride = PropertyTable[t].stride;
+    destOffset += stride;
+    is.read((char*) scratch, stride);
 
     switch (t)
     {
-        case Type::INT8:       ply_cast<int8_t>(dest, src.data(), isBigEndian);        break;
-        case Type::UINT8:      ply_cast<uint8_t>(dest, src.data(), isBigEndian);       break;
-        case Type::INT16:      ply_cast<int16_t>(dest, src.data(), isBigEndian);       break;
-        case Type::UINT16:     ply_cast<uint16_t>(dest, src.data(), isBigEndian);      break;
-        case Type::INT32:      ply_cast<int32_t>(dest, src.data(), isBigEndian);       break;
-        case Type::UINT32:     ply_cast<uint32_t>(dest, src.data(), isBigEndian);      break;
-        case Type::FLOAT32:    ply_cast_float<float>(dest, src.data(), isBigEndian);   break;
-        case Type::FLOAT64:    ply_cast_double<double>(dest, src.data(), isBigEndian); break;
+        case Type::INT8:       ply_cast<int8_t>(dest, (char*)scratch, isBigEndian);        break;
+        case Type::UINT8:      ply_cast<uint8_t>(dest, (char*)scratch, isBigEndian);       break;
+        case Type::INT16:      ply_cast<int16_t>(dest, (char*)scratch, isBigEndian);       break;
+        case Type::UINT16:     ply_cast<uint16_t>(dest, (char*)scratch, isBigEndian);      break;
+        case Type::INT32:      ply_cast<int32_t>(dest, (char*)scratch, isBigEndian);       break;
+        case Type::UINT32:     ply_cast<uint32_t>(dest, (char*)scratch, isBigEndian);      break;
+        case Type::FLOAT32:    ply_cast_float<float>(dest, (char*)scratch, isBigEndian);   break;
+        case Type::FLOAT64:    ply_cast_double<double>(dest, (char*)scratch, isBigEndian); break;
         case Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
 
-    return PropertyTable[t].stride;
+    return stride;
 }
 
 size_t PlyFile::PlyFileImpl::read_property_ascii(const Type t, void * dest, size_t & destOffset, std::istream & is)
 {
-    destOffset += PropertyTable[t].stride;
+    const int32_t stride = PropertyTable[t].stride;
+    destOffset += stride;
 
     switch (t)
     {
@@ -313,7 +316,7 @@ size_t PlyFile::PlyFileImpl::read_property_ascii(const Type t, void * dest, size
         case Type::FLOAT64:    ply_cast_ascii<double>(dest, is);                       break;
         case Type::INVALID:    throw std::invalid_argument("invalid ply property");
     }
-    return PropertyTable[t].stride;
+    return stride;
 }
 
 void PlyFile::PlyFileImpl::write_property_ascii(Type t, std::ostream & os, uint8_t * src, size_t & srcOffset)
@@ -556,13 +559,13 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
 
     if (isBinary)
     {
-        read = [&](const Type t, void * dest, size_t & destOffset, std::istream & _is) { return read_property_binary(t, dest, destOffset, _is); };
-        skip = [&](const PlyProperty & p, std::istream & _is) { return skip_property_binary(p, _is); };
+        read = [this](const Type t, void * dest, size_t & destOffset, std::istream & _is) { return read_property_binary(t, dest, destOffset, _is); };
+        skip = [this](const PlyProperty & p, std::istream & _is) { return skip_property_binary(p, _is); };
     }
     else
     {
-        read = [&](const Type t, void * dest, size_t & destOffset, std::istream & _is) { return read_property_ascii(t, dest, destOffset, _is); };
-        skip = [&](const PlyProperty & p, std::istream & _is) { return skip_property_ascii(p, _is); };
+        read = [this](const Type t, void * dest, size_t & destOffset, std::istream & _is) { return read_property_ascii(t, dest, destOffset, _is); };
+        skip = [this](const PlyProperty & p, std::istream & _is) { return skip_property_ascii(p, _is); };
     }
 
     for (auto & element : elements)
