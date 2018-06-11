@@ -3,7 +3,7 @@
 // distribute, and modify this file as you see fit.
 // Authored in 2015 by Dimitri Diakopoulos (http://www.dimitridiakopoulos.com)
 // https://github.com/ddiakopoulos/tinyply
-// Version 2.0
+// Version 2.1
 
 #ifndef tinyply_h
 #define tinyply_h
@@ -107,7 +107,7 @@ namespace tinyply
         void write(std::ostream & os, bool isBinary);
 
         std::vector<PlyElement> get_elements() const;
-        std::vector<std::string> & get_comments();
+        std::vector<std::string> get_comments() const;
         std::vector<std::string> get_info() const;
 
         std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);

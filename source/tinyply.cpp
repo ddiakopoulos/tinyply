@@ -3,7 +3,7 @@
 // distribute, and modify this file as you see fit.
 // Authored in 2015 by Dimitri Diakopoulos (http://www.dimitridiakopoulos.com)
 // https://github.com/ddiakopoulos/tinyply
-// Version 2.0
+// Version 2.1
 
 #include "tinyply.h"
 #include <algorithm>
@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <iostream>
 #include <cstring>
+#include <unordered_map>
 
 using namespace tinyply;
 using namespace std;
@@ -43,6 +44,21 @@ inline double endian_swap_double(const uint64_t & v) { union { double d; uint64_
 // Internal Implementation //
 /////////////////////////////
 
+inline uint32_t hash_fnv1a(const std::string & str)
+{
+    static const uint32_t fnv1aBase32 = 0x811C9DC5u;
+    static const uint32_t fnv1aPrime32 = 0x01000193u;
+
+    uint32_t result = fnv1aBase32;
+
+    for (auto & c : str)
+    {
+        result ^= static_cast<uint32_t>(c);
+        result *= fnv1aPrime32;
+    }
+    return result;
+}
+
 inline Type property_type_from_string(const std::string & t)
 {
     if (t == "int8" || t == "char")             return Type::INT8;
@@ -70,7 +86,7 @@ struct PlyFile::PlyFileImpl
         std::shared_ptr<PlyCursor> cursor;
     };
 
-    std::map<std::string, ParsingHelper> userData;
+    std::unordered_map<uint32_t, ParsingHelper> userData;
 
     bool isBinary = false;
     bool isBigEndian = false;
@@ -134,11 +150,6 @@ PlyElement::PlyElement(std::istream & is)
 ///////////
 // Utils //
 ///////////
-
-std::string make_key(const std::string & a, const std::string & b)
-{
-    return (a + "-" + b);
-}
 
 template<typename T> void ply_cast(void * dest, const char * src, bool be)
 {
@@ -374,7 +385,7 @@ void PlyFile::PlyFileImpl::write_binary_internal(std::ostream & os)
         {
             for (auto & p : e.properties)
             {
-                auto & helper = userData[make_key(e.name, p.name)];
+                auto & helper = userData[hash_fnv1a(e.name + p.name)];
                 if (p.isList)
                 {
                     uint8_t listSize[4] = {0, 0, 0, 0};
@@ -405,7 +416,7 @@ void PlyFile::PlyFileImpl::write_ascii_internal(std::ostream & os)
         {
             for (auto & p : e.properties)
             {
-                auto & helper = userData[make_key(e.name, p.name)];
+                auto & helper = userData[hash_fnv1a(e.name + p.name)];
                 if (p.isList)
                 {
                     os << p.listCount << " ";
@@ -489,11 +500,9 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
             {
                 // We found the property
                 const PlyProperty & property = element.properties[propertyIndex];
-
-                helper.data->t = property.propertyType; // hmm....
-
-                auto result = userData.insert(std::pair<std::string, ParsingHelper>(make_key(element.name, property.name), helper));
-                if (result.second == false) throw std::invalid_argument("element-property key has already been requested: " + make_key(element.name, property.name));
+                helper.data->t = property.propertyType; 
+                auto result = userData.insert(std::pair<uint32_t, ParsingHelper>(hash_fnv1a(element.name + property.name), helper));
+                if (result.second == false) throw std::invalid_argument("element-property key has already been requested: " + hash_fnv1a(element.name + property.name));
             }
             else throw std::invalid_argument("one of the property keys was not found in the header: " + key);
         }
@@ -519,7 +528,7 @@ void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & element
         for (auto key : propertyKeys)
         {
             PlyProperty newProp = (listType == Type::INVALID) ? PlyProperty(type, key) : PlyProperty(listType, type, key, listCount);
-            /* auto result = */userData.insert(std::pair<std::string, ParsingHelper>(make_key(elementKey, key), helper));
+            userData.insert(std::pair<uint32_t, ParsingHelper>(hash_fnv1a(elementKey + key), helper));
             e.properties.push_back(newProp);
         }
     };
@@ -562,7 +571,7 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
         {
             for (auto & property : element.properties)
             {
-                auto cursorIt = userData.find(make_key(element.name, property.name));
+                auto cursorIt = userData.find(hash_fnv1a(element.name + property.name));
                 if (cursorIt != userData.end())
                 {
                     auto & helper = cursorIt->second;
@@ -601,7 +610,7 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
 }
 
 ///////////////////////////////////
-// Pass-Through Public Interface //
+// Passthrough Public Interface //
 ///////////////////////////////////
 
 PlyFile::PlyFile() { impl.reset(new PlyFileImpl()); };
@@ -610,7 +619,7 @@ bool PlyFile::parse_header(std::istream & is) { return impl->parse_header(is); }
 void PlyFile::read(std::istream & is) { return impl->read(is); }
 void PlyFile::write(std::ostream & os, bool isBinary) { return impl->write(os, isBinary); }
 std::vector<PlyElement> PlyFile::get_elements() const { return impl->elements; }
-std::vector<std::string> & PlyFile::get_comments() { return impl->comments; }
+std::vector<std::string> PlyFile::get_comments() const { return impl->comments; }
 std::vector<std::string> PlyFile::get_info() const { return impl->objInfo; }
 std::shared_ptr<PlyData> PlyFile::request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys)
 {
