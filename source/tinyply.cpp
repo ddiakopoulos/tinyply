@@ -178,13 +178,13 @@ template<typename T> void ply_cast_ascii(void * dest, std::istream & is)
     *(static_cast<T *>(dest)) = ply_read_ascii<T>(is);
 }
 
-size_t find_element(const std::string & key, const std::vector<PlyElement> & list)
+int64_t find_element(const std::string & key, const std::vector<PlyElement> & list)
 {
     for (size_t i = 0; i < list.size(); i++) if (list[i].name == key) return i;
     return -1;
 }
 
-size_t find_property(const std::string & key, const std::vector<PlyProperty> & list)
+int64_t find_property(const std::string & key, const std::vector<PlyProperty> & list)
 {
     for (size_t i = 0; i < list.size(); ++i) if (list[i].name == key) return i;
     return -1;
@@ -503,7 +503,7 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
     if (!propertyKeys.size()) throw std::invalid_argument("`propertyKeys` argument is empty");
     if (elementKey.size() == 0) throw std::invalid_argument("`elementKey` argument is empty");
 
-    const int elementIndex = find_element(elementKey, elements);
+    const int64_t elementIndex = find_element(elementKey, elements);
 
     // Sanity check if the user requested element is in the pre-parsed header
     if (elementIndex >= 0)
@@ -516,8 +516,7 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
         // Find each of the keys
         for (auto key : propertyKeys)
         {
-            const int propertyIndex = find_property(key, element.properties);
-
+            const int64_t propertyIndex = find_property(key, element.properties);
             if (propertyIndex >= 0)
             {
                 // We found the property
@@ -525,7 +524,10 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
                 helper.data->t = property.propertyType; 
                 helper.data->isList = property.isList;
                 auto result = userData.insert(std::pair<uint32_t, ParsingHelper>(hash_fnv1a(element.name + property.name), helper));
-                if (result.second == false) throw std::invalid_argument("element-property key has already been requested: " + hash_fnv1a(element.name + property.name));
+                if (result.second == false)
+                {
+                    throw std::invalid_argument("element-property key has already been requested: " + hash_fnv1a(element.name + property.name));
+                }
             }
             else throw std::invalid_argument("one of the property keys was not found in the header: " + key);
         }
@@ -556,7 +558,7 @@ void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & element
         }
     };
 
-    int idx = find_element(elementKey, elements);
+    int64_t idx = find_element(elementKey, elements);
     if (idx >= 0)
     {
         PlyElement & e = elements[idx];

@@ -77,12 +77,13 @@ namespace tinyply
     {
         PlyProperty(std::istream & is);
         PlyProperty(Type type, std::string & _name) : name(_name), propertyType(type) {}
-        PlyProperty(Type list_type, Type prop_type, std::string & _name, int list_count) : name(_name), propertyType(prop_type), isList(true), listType(list_type), listCount(list_count) {}
+        PlyProperty(Type list_type, Type prop_type, std::string & _name, size_t list_count) 
+            : name(_name), propertyType(prop_type), isList(true), listType(list_type), listCount(list_count) {}
         std::string name;
         Type propertyType;
         bool isList{ false };
         Type listType{ Type::INVALID };
-        int listCount{ 0 };
+        size_t listCount{ 0 };
     };
 
     struct PlyElement
@@ -130,8 +131,16 @@ namespace tinyply
         std::vector<std::string> get_info() const;
         std::vector<std::string> & get_comments();
 
-        std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
-        void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount);
+        std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, 
+            const std::initializer_list<std::string> propertyKeys);
+
+        void add_properties_to_element(const std::string & elementKey, 
+            const std::initializer_list<std::string> propertyKeys, 
+            const Type type, 
+            const size_t count, 
+            uint8_t * data, 
+            const Type listType, 
+            const size_t listCount);
     };
 
 } // namespace tinyply
