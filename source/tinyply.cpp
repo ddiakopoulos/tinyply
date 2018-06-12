@@ -94,7 +94,7 @@ struct PlyFile::PlyFileImpl
     std::vector<std::string> objInfo;
     uint8_t scratch[128];
 
-    void read(std::istream & is);
+    void read(std::istream & is, uint32_t fixed_list_size);
     void write(std::ostream & os, bool isBinary);
 
     std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
@@ -343,13 +343,17 @@ void PlyFile::PlyFileImpl::write_property_binary(Type t, std::ostream & os, uint
     srcOffset += PropertyTable[t].stride;
 }
 
-void PlyFile::PlyFileImpl::read(std::istream & is)
+void PlyFile::PlyFileImpl::read(std::istream & is, uint32_t fixed_list_size)
 {
     // Parse but only get the data size
-    parse_data(is, true);
+    if (fixed_list_size == 0) parse_data(is, true);
 
     std::vector<std::shared_ptr<PlyData>> buffers;
     for (auto & entry : userData) buffers.push_back(entry.second.data);
+
+    // Count the number of properties (required for allocation)
+    std::unordered_map<PlyData*, int32_t> uniqueCount;
+    for (auto & ptr : buffers) uniqueCount[ptr.get()] += 1;
 
     // Since group-requested properties share the same cursor, we need to find unique cursors so we only allocate once
     std::sort(buffers.begin(), buffers.end());
@@ -362,7 +366,21 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
         {
             if (entry.second.data == b && b->buffer.get() == nullptr)
             {
-                b->buffer = Buffer(entry.second.cursor->totalSizeBytes);
+                // A fixed_list_size of 0 means we have executed two passes over the file
+                // to compute the total length of all (potentially) variable-length lists
+                if (fixed_list_size == 0)
+                {
+                    b->buffer = Buffer(entry.second.cursor->totalSizeBytes);
+                }
+                else
+                {
+                    // otherwise, we can allocate up front and skip the first pass for extra speed.
+                    auto bytes = entry.second.data->count * PropertyTable[entry.second.data->t].stride * (entry.second.data->isList ? fixed_list_size : 1);
+                    bytes *= uniqueCount[b.get()];
+
+                    b->buffer = Buffer(bytes);
+                }
+
             }
         }
     }
@@ -382,6 +400,9 @@ void PlyFile::PlyFileImpl::write_binary_internal(std::ostream & os)
     isBinary = true;
     write_header(os);
 
+    uint8_t listSize[4] = { 0, 0, 0, 0 };
+    size_t dummyCount = 0;
+
     for (auto & e : elements)
     {
         for (size_t i = 0; i < e.size; ++i)
@@ -391,9 +412,7 @@ void PlyFile::PlyFileImpl::write_binary_internal(std::ostream & os)
                 auto & helper = userData[hash_fnv1a(e.name + p.name)];
                 if (p.isList)
                 {
-                    uint8_t listSize[4] = {0, 0, 0, 0};
                     std::memcpy(listSize, &p.listCount, sizeof(uint32_t));
-                    size_t dummyCount = 0;
                     write_property_binary(p.listType, os, listSize, dummyCount);
                     for (int j = 0; j < p.listCount; ++j)
                     {
@@ -468,13 +487,13 @@ void PlyFile::PlyFileImpl::write_header(std::ostream & os)
     os << "end_header\n";
 }
 
-// Returns the size (in bytes)
 std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys)
 {
     // All requested properties in the userDataTable share the same cursor (thrown into the same flat array)
     ParsingHelper helper;
     helper.data = std::make_shared<PlyData>();
     helper.data->count = 0;
+    helper.data->isList = false;
     helper.data->t = Type::INVALID;
     helper.cursor = std::make_shared<PlyCursor>();
     helper.cursor->byteOffset = 0;
@@ -504,6 +523,7 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
                 // We found the property
                 const PlyProperty & property = element.properties[propertyIndex];
                 helper.data->t = property.propertyType; 
+                helper.data->isList = property.isList;
                 auto result = userData.insert(std::pair<uint32_t, ParsingHelper>(hash_fnv1a(element.name + property.name), helper));
                 if (result.second == false) throw std::invalid_argument("element-property key has already been requested: " + hash_fnv1a(element.name + property.name));
             }
@@ -619,7 +639,7 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
 PlyFile::PlyFile() { impl.reset(new PlyFileImpl()); };
 PlyFile::~PlyFile() { };
 bool PlyFile::parse_header(std::istream & is) { return impl->parse_header(is); }
-void PlyFile::read(std::istream & is) { return impl->read(is); }
+void PlyFile::read(std::istream & is, uint32_t fixed_list_size) { return impl->read(is, fixed_list_size); }
 void PlyFile::write(std::ostream & os, bool isBinary) { return impl->write(os, isBinary); }
 std::vector<PlyElement> PlyFile::get_elements() const { return impl->elements; }
 std::vector<std::string> & PlyFile::get_comments() { return impl->comments; }

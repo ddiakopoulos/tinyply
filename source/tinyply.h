@@ -60,7 +60,7 @@ namespace tinyply
     public:
         Buffer() {};
         Buffer(const size_t size) : data(new uint8_t[size], delete_array()), size(size) { alias = data.get(); } // allocating
-        Buffer(uint8_t * ptr) { alias = ptr; } // non-allocating, fixme: set size?
+        Buffer(uint8_t * ptr) { alias = ptr; } // non-allocating, todo: set size?
         uint8_t * get() { return alias; }
         size_t size_bytes() const { return size; }
     };
@@ -70,6 +70,7 @@ namespace tinyply
         Type t;
         size_t count;
         Buffer buffer;
+        bool isList;
     };
 
     struct PlyProperty
@@ -101,20 +102,38 @@ namespace tinyply
         PlyFile();
         ~PlyFile();
 
+        /*
+         * The ply format requires an ascii header. This can be used to determine at 
+         * runtime which properties or elements exist in the file. Limited validation of the 
+         * header is performed; it is assumed the header correctly reflects the contents of the 
+         * payload. This function may throw. Returns true on success, false on failure. 
+         */ 
         bool parse_header(std::istream & is);
 
-        void read(std::istream & is);
+        /* 
+         * In the general case where |fixed_list_size| is zero, `read` performs a two-pass 
+         * parse to support variable length lists. The first pass determines the size of memory
+         * to allocate, while the second pass performs the read. The most general use of the 
+         * ply format is storing triangle meshes. When this fact is known a-priori, we can pass 
+         * an expected list length that will apply to *all* list elements in a file (e.g. 3). Doing 
+         * so results in an up-front memory allocation and a single-pass import, generally a ~2x speedup. 
+         */
+        void read(std::istream & is, uint32_t fixed_list_size = 0);
 
+        /* 
+         * `write` performs no validation and assumes that the data passed into 
+         * `add_properties_to_element` is well-formed. 
+         */
         void write(std::ostream & os, bool isBinary);
 
         std::vector<PlyElement> get_elements() const;
-        std::vector<std::string> & get_comments();
         std::vector<std::string> get_info() const;
+        std::vector<std::string> & get_comments();
 
         std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys);
         void add_properties_to_element(const std::string & elementKey, const std::initializer_list<std::string> propertyKeys, const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount);
     };
 
-} // namesapce tinyply
+} // namespace tinyply
 
 #endif // tinyply_h
