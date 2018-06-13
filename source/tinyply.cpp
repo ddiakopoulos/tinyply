@@ -209,7 +209,7 @@ bool PlyFile::PlyFileImpl::parse_header(std::istream & is)
         else if (token == "property")   read_header_property(ls);
         else if (token == "obj_info")   read_header_text(line, ls, objInfo, 9);
         else if (token == "end_header") break;
-        else return false;
+        else return false; // unexpected header field
     }
     return true;
 }
@@ -566,7 +566,7 @@ void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & element
     }
     else
     {
-        PlyElement newElement = (listType == Type::INVALID) ? PlyElement(elementKey, count / propertyKeys.size()) : PlyElement(elementKey, count / listCount);
+        PlyElement newElement = (listType == Type::INVALID) ? PlyElement(elementKey, count) : PlyElement(elementKey, count);
         create_property_on_element(newElement);
         elements.push_back(newElement);
     }
