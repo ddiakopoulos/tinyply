@@ -167,7 +167,6 @@ void read_ply_file(const std::string & filepath)
 
 		// type casting to your own native types - Option B
 		{
-			const size_t numVerticesBytes = vertices->buffer.size_bytes();
 			std::vector<float3> verts_floats;
 			std::vector<double3> verts_doubles;
 			if (vertices->t == tinyply::Type::FLOAT32) { /* as floats ... */ }
