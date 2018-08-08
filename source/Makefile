@@ -6,3 +6,4 @@ tinyply-core: tinyply.h tinyply.cpp example.cpp
 .PHONY: clean
 clean:
 	rm tinyply-core
+	

@@ -6,14 +6,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 project(tinyply LANGUAGES CXX)
-set(PROJECT_VERSION 2.0)
+set(PROJECT_VERSION 2.2)
 
 include_directories("${CMAKE_SOURCE_DIR}/source")
 
 set(CMAKE_DEBUG_POSTFIX "d")
 
 # Library
-set( SHARED_LIB false CACHE BOOL "Wether to build as shared library")
+set( SHARED_LIB false CACHE BOOL "Build as shared library")
 if(${SHARED_LIB})
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     add_library(tinyply SHARED source/tinyply.cpp source/tinyply.h)
