@@ -525,6 +525,7 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
     
             switch (b->t)
             {
+		    default: break;
             case Type::INT16:   endian_swap_buffer<int16_t, int16_t>(data_ptr, buffer_size_bytes, stride);   break;
             case Type::UINT16:  endian_swap_buffer<uint16_t, uint16_t>(data_ptr, buffer_size_bytes, stride); break;
             case Type::INT32:   endian_swap_buffer<int32_t, int32_t>(data_ptr, buffer_size_bytes, stride);   break;
