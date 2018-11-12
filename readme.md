@@ -7,7 +7,7 @@ Platform | Build Status |
 -------- | ------------ |
 GCC 4.9 and Clang 3.7 | [Travis CI](http://travis-ci.org): [![Build status](http://travis-ci.org/ddiakopoulos/tinyply.svg?branch=master)](https://travis-ci.org/ddiakopoulos/tinyply) |
 
-A single-headeder, zero-dependency (except the C++ STL) public domain implementation of the PLY mesh file format. An overview and definition of the file format is available [here](http://paulbourke.net/dataformats/ply/). This format is often used in the computer vision and graphics communities for its relative simplicity, ability to support arbitrary mesh attributes, and binary modes.
+A single-header, zero-dependency (except the C++ STL) public domain implementation of the PLY mesh file format. An overview and definition of the file format is available [here](http://paulbourke.net/dataformats/ply/). This format is often used in the computer vision and graphics communities for its relative simplicity, ability to support arbitrary mesh attributes, and binary modes.
 
 The library is written in C++11 and requires a recent compiler (GCC 4.8+ / VS2013+ / Clang 2.9+). Tinyply supports exporting and importing PLY files in both binary and ascii formats. Tinyply supports filesizes >= 4gb and can read big-endian binary files (but not write them). 
 
