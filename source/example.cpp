@@ -4,14 +4,11 @@
 // https://github.com/ddiakopoulos/tinyply
 // Version 2.2
 
-#include <thread>
+#include <array>
 #include <chrono>
-#include <vector>
-#include <sstream>
+#include <cstring>
 #include <fstream>
 #include <iostream>
-#include <cstring>
-#include <iterator>
 
 #include "tinyply.h"
 using namespace tinyply;
@@ -44,15 +41,21 @@ inline geometry make_cube_geometry()
 {
     geometry cube;
 
-    const struct CubeVertex { float3 position, normal; float2 texCoord; } verts[] = {
+    struct CubeVertex
+    {
+        float3 position, normal;
+        float2 texCoord;
+    };
+
+    const std::array<CubeVertex, 24> verts = {{
     { { -1, -1, -1 },{ -1, 0, 0 },{ 0, 0 } },{ { -1, -1, +1 },{ -1, 0, 0 },{ 1, 0 } },{ { -1, +1, +1 },{ -1, 0, 0 },{ 1, 1 } },{ { -1, +1, -1 },{ -1, 0, 0 },{ 0, 1 } },
     { { +1, -1, +1 },{ +1, 0, 0 },{ 0, 0 } },{ { +1, -1, -1 },{ +1, 0, 0 },{ 1, 0 } },{ { +1, +1, -1 },{ +1, 0, 0 },{ 1, 1 } },{ { +1, +1, +1 },{ +1, 0, 0 },{ 0, 1 } },
     { { -1, -1, -1 },{ 0, -1, 0 },{ 0, 0 } },{ { +1, -1, -1 },{ 0, -1, 0 },{ 1, 0 } },{ { +1, -1, +1 },{ 0, -1, 0 },{ 1, 1 } },{ { -1, -1, +1 },{ 0, -1, 0 },{ 0, 1 } },
     { { +1, +1, -1 },{ 0, +1, 0 },{ 0, 0 } },{ { -1, +1, -1 },{ 0, +1, 0 },{ 1, 0 } },{ { -1, +1, +1 },{ 0, +1, 0 },{ 1, 1 } },{ { +1, +1, +1 },{ 0, +1, 0 },{ 0, 1 } },
     { { -1, -1, -1 },{ 0, 0, -1 },{ 0, 0 } },{ { -1, +1, -1 },{ 0, 0, -1 },{ 1, 0 } },{ { +1, +1, -1 },{ 0, 0, -1 },{ 1, 1 } },{ { +1, -1, -1 },{ 0, 0, -1 },{ 0, 1 } },
-    { { -1, +1, +1 },{ 0, 0, +1 },{ 0, 0 } },{ { -1, -1, +1 },{ 0, 0, +1 },{ 1, 0 } },{ { +1, -1, +1 },{ 0, 0, +1 },{ 1, 1 } },{ { +1, +1, +1 },{ 0, 0, +1 },{ 0, 1 } }};
+    { { -1, +1, +1 },{ 0, 0, +1 },{ 0, 0 } },{ { -1, -1, +1 },{ 0, 0, +1 },{ 1, 0 } },{ { +1, -1, +1 },{ 0, 0, +1 },{ 1, 1 } },{ { +1, +1, +1 },{ 0, 0, +1 },{ 0, 1 } }}};
 
-    std::vector<uint4> quads = { { 0, 1, 2, 3 },{ 4, 5, 6, 7 },{ 8, 9, 10, 11 },{ 12, 13, 14, 15 },{ 16, 17, 18, 19 },{ 20, 21, 22, 23 } };
+    const std::array<uint4, 6> quads = {{ { 0, 1, 2, 3 },{ 4, 5, 6, 7 },{ 8, 9, 10, 11 },{ 12, 13, 14, 15 },{ 16, 17, 18, 19 },{ 20, 21, 22, 23 } }};
 
     for (auto & q : quads)
     {
@@ -60,11 +63,11 @@ inline geometry make_cube_geometry()
         cube.triangles.push_back({ q.x,q.z,q.w });
     }
 
-    for (int i = 0; i < 24; ++i)
+    for (const auto & vertex : verts)
     {
-        cube.vertices.push_back(verts[i].position);
-        cube.normals.push_back(verts[i].normal);
-        cube.texcoords.push_back(verts[i].texCoord);
+        cube.vertices.push_back(vertex.position);
+        cube.normals.push_back(vertex.normal);
+        cube.texcoords.push_back(vertex.texCoord);
     }
 
     return cube;
