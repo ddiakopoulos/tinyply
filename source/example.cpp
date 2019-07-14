@@ -118,11 +118,17 @@ void read_ply_file(const std::string & filepath)
 		file.parse_header(ss);
 
 		std::cout << "........................................................................\n";
-		for (auto c : file.get_comments()) std::cout << "Comment: " << c << std::endl;
-		for (auto e : file.get_elements())
+		for (const auto & c : file.get_comments())
+		{
+			std::cout << "Comment: " << c << std::endl;
+		}
+		for (const auto & e : file.get_elements())
 		{
 			std::cout << "element - " << e.name << " (" << e.size << ")" << std::endl;
-			for (auto p : e.properties) std::cout << "\tproperty - " << p.name << " (" << tinyply::PropertyTable[p.propertyType].str << ")" << std::endl;
+			for (const auto & p : e.properties)
+			{
+				std::cout << "\tproperty - " << p.name << " (" << tinyply::PropertyTable[p.propertyType].str << ")" << std::endl;
+			}
 		}
 		std::cout << "........................................................................\n";
 
