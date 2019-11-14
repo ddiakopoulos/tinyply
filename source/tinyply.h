@@ -470,7 +470,7 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
 
     // Discover if we can allocate up front without parsing the file twice 
     uint32_t list_hints = 0;
-    for (auto & b : buffers) for (auto & entry : userData) list_hints += entry.second.list_size_hint;
+    for (auto & b : buffers) for (auto & entry : userData) {list_hints += entry.second.list_size_hint;(void)b;}
 
     // No list hints? Then we need to calculate how much memory to allocate
     if (list_hints == 0) parse_data(is, true);
@@ -531,6 +531,7 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
             case Type::UINT32:  endian_swap_buffer<uint32_t, uint32_t>(data_ptr, buffer_size_bytes, stride); break;
             case Type::FLOAT32: endian_swap_buffer<uint32_t, float>(data_ptr, buffer_size_bytes, stride);    break;
             case Type::FLOAT64: endian_swap_buffer<uint64_t, double>(data_ptr, buffer_size_bytes, stride);   break;
+            default:break;
             }
         }
     }
@@ -596,7 +597,7 @@ void PlyFile::PlyFileImpl::write_ascii_internal(std::ostream & os)
                 if (p.isList)
                 {
                     os << p.listCount << " ";
-                    for (int j = 0; j < p.listCount; ++j)
+                    for (size_t j = 0; j < p.listCount; ++j)
                     {
                         write_property_ascii(p.propertyType, os, (helper.data->buffer.get() + helper.cursor->byteOffset), helper.cursor->byteOffset);
                     }
@@ -769,6 +770,7 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
             case Type::UINT16: endian_swap<uint16_t, uint16_t>(*(uint16_t*)dst); break;
             case Type::INT32:  endian_swap<int32_t, int32_t>(*(int32_t*)dst);    break;
             case Type::UINT32: endian_swap<uint32_t, uint32_t>(*(uint32_t*)dst); break;
+            default: break;
             }
         }
 
