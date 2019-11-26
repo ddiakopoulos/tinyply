@@ -1,5 +1,5 @@
 /*
- * tinyply 2.2 (https://github.com/ddiakopoulos/tinyply)
+ * tinyply 2.3 (https://github.com/ddiakopoulos/tinyply)
  *
  * A single-header, zero-dependency (except the C++ STL) public domain implementation 
  * of the PLY mesh file format. Requires C++11; errors are handled through exceptions.
@@ -26,6 +26,7 @@
 #include <vector>
 #include <string>
 #include <stdint.h>
+#include <cstddef>
 #include <sstream>
 #include <memory>
 #include <unordered_map>
@@ -49,21 +50,24 @@ namespace tinyply
 
     struct PropertyInfo
     {
+        PropertyInfo() {};
+        PropertyInfo(int stride, std::string str)
+            : stride(stride), str(str) {}
         int stride {0};
         std::string str;
     };
 
     static std::map<Type, PropertyInfo> PropertyTable
     {
-        { Type::INT8,    { 1, "char" } },
-        { Type::UINT8,   { 1, "uchar" } },
-        { Type::INT16,   { 2, "short" } },
-        { Type::UINT16,  { 2, "ushort" } },
-        { Type::INT32,   { 4, "int" } },
-        { Type::UINT32,  { 4, "uint" } },
-        { Type::FLOAT32, { 4, "float" } },
-        { Type::FLOAT64, { 8, "double" } },
-        { Type::INVALID, { 0, "INVALID" } }
+        { Type::INT8,    PropertyInfo(1, std::string("char")) },
+        { Type::UINT8,   PropertyInfo(1, std::string("uchar")) },
+        { Type::INT16,   PropertyInfo(2, std::string("short")) },
+        { Type::UINT16,  PropertyInfo(2, std::string("ushort")) },
+        { Type::INT32,   PropertyInfo(4, std::string("int")) },
+        { Type::UINT32,  PropertyInfo(4, std::string("uint")) },
+        { Type::FLOAT32, PropertyInfo(4, std::string("float")) },
+        { Type::FLOAT64, PropertyInfo(8, std::string("double")) },
+        { Type::INVALID, PropertyInfo(0, std::string("INVALID"))}
     };
 
     class Buffer
@@ -796,11 +800,8 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
             {
                 read_property_binary(p.propertyType, f.prop_stride, dest + destOffset, destOffset, _is);
             }
-            else
-            {
-                read_list_binary(p.listType, &listSize, dummyCount, f.list_stride, _is); // the list size
-                read_property_binary(p.propertyType, f.prop_stride * listSize, dest + destOffset, destOffset, _is); // properties in list
-            }
+            read_list_binary(p.listType, &listSize, dummyCount, f.list_stride, _is); // the list size
+            read_property_binary(p.propertyType, f.prop_stride * listSize, dest + destOffset, destOffset, _is); // properties in list
         };
         skip = [this, &listSize, &dummyCount, &read_list_binary](PropertyLookup & f, const PlyProperty & p, std::istream & _is)
         {
@@ -875,8 +876,8 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
 
 // Wrap the public interface:
 
-PlyFile::PlyFile() { impl.reset(new PlyFileImpl()); };
-PlyFile::~PlyFile() { };
+PlyFile::PlyFile() { impl.reset(new PlyFileImpl()); }
+PlyFile::~PlyFile() { }
 bool PlyFile::parse_header(std::istream & is) { return impl->parse_header(is); }
 void PlyFile::read(std::istream & is) { return impl->read(is); }
 void PlyFile::write(std::ostream & os, bool isBinary) { return impl->write(os, isBinary); }
