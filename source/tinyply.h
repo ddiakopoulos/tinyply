@@ -49,7 +49,7 @@ namespace tinyply
 
     struct PropertyInfo
     {
-        int stride;
+        int stride {0};
         std::string str;
     };
 
@@ -71,11 +71,11 @@ namespace tinyply
         uint8_t * alias{ nullptr };
         struct delete_array { void operator()(uint8_t * p) { delete[] p; } };
         std::unique_ptr<uint8_t, decltype(Buffer::delete_array())> data;
-        size_t size;
+        size_t size {0};
     public:
         Buffer() {};
         Buffer(const size_t size) : data(new uint8_t[size], delete_array()), size(size) { alias = data.get(); } // allocating
-        Buffer(uint8_t * ptr) { alias = ptr; } // non-allocating, todo: set size?
+        Buffer(uint8_t * ptr): alias(ptr) { } // non-allocating, todo: set size?
         uint8_t * get() { return alias; }
         size_t size_bytes() const { return size; }
     };
@@ -83,9 +83,9 @@ namespace tinyply
     struct PlyData
     {
         Type t;
-        size_t count;
         Buffer buffer;
-        bool isList;
+        size_t count {0};
+        bool isList {false};
     };
 
     struct PlyProperty
@@ -106,7 +106,7 @@ namespace tinyply
         PlyElement(std::istream & istream);
         PlyElement(const std::string & _name, size_t count) : name(_name), size(count) {}
         std::string name;
-        size_t size;
+        size_t size {0};
         std::vector<PlyProperty> properties;
     };
 
