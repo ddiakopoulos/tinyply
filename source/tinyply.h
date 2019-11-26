@@ -55,15 +55,15 @@ namespace tinyply
 
     static std::map<Type, PropertyInfo> PropertyTable
     {
-        { Type::INT8,    PropertyInfo{ 1, "char" } },
-        { Type::UINT8,   PropertyInfo{ 1, "uchar" } },
-        { Type::INT16,   PropertyInfo{ 2, "short" } },
-        { Type::UINT16,  PropertyInfo{ 2, "ushort" } },
-        { Type::INT32,   PropertyInfo{ 4, "int" } },
-        { Type::UINT32,  PropertyInfo{ 4, "uint" } },
-        { Type::FLOAT32, PropertyInfo{ 4, "float" } },
-        { Type::FLOAT64, PropertyInfo{ 8, "double" } },
-        { Type::INVALID, PropertyInfo{ 0, "INVALID" } }
+        { Type::INT8,    PropertyInfo{ 1, std::string("char") } },
+        { Type::UINT8,   PropertyInfo{ 1, std::string("uchar") } },
+        { Type::INT16,   PropertyInfo{ 2, std::string("short") } },
+        { Type::UINT16,  PropertyInfo{ 2, std::string("ushort") } },
+        { Type::INT32,   PropertyInfo{ 4, std::string("int") } },
+        { Type::UINT32,  PropertyInfo{ 4, std::string("uint") } },
+        { Type::FLOAT32, PropertyInfo{ 4, std::string("float") } },
+        { Type::FLOAT64, PropertyInfo{ 8, std::string("double") } },
+        { Type::INVALID, PropertyInfo{ 0, std::string("INVALID") } }
     };
 
     class Buffer
@@ -875,8 +875,8 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
 
 // Wrap the public interface:
 
-PlyFile::PlyFile() { impl.reset(new PlyFileImpl()); };
-PlyFile::~PlyFile() { };
+PlyFile::PlyFile() { impl.reset(new PlyFileImpl()); }
+PlyFile::~PlyFile() { }
 bool PlyFile::parse_header(std::istream & is) { return impl->parse_header(is); }
 void PlyFile::read(std::istream & is) { return impl->read(is); }
 void PlyFile::write(std::ostream & os, bool isBinary) { return impl->write(os, isBinary); }
