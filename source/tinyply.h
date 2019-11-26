@@ -768,9 +768,8 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
     // after reading. We do this as a performance optimization; endian flipping is
     // done on regular properties as a post-process after reading (also for optimization)
     // but we need the correct little-endian list count as we read the file. 
-    auto read_list_binary = [this](const Type & t, void * dst, size_t & destOffset, std::istream & _is)
+    auto read_list_binary = [this](const Type & t, void * dst, size_t & destOffset, const size_t & stride, std::istream & _is)
     {
-        const size_t stride = PropertyTable[t].stride; // @todo - this is already precomputed
         destOffset += stride;
         _is.read((char*)dst, stride);
 
@@ -799,7 +798,7 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
             }
             else
             {
-                read_list_binary(p.listType, &listSize, dummyCount, _is); // the list size
+                read_list_binary(p.listType, &listSize, dummyCount, f.list_stride, _is); // the list size
                 read_property_binary(p.propertyType, f.prop_stride * listSize, dest + destOffset, destOffset, _is); // properties in list
             }
         };
@@ -810,7 +809,7 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
                 _is.read((char*)scratch, f.prop_stride);
                 return f.prop_stride;
             }
-            read_list_binary(p.listType, &listSize, dummyCount, _is); // the list size (does not count for memory alloc)
+            read_list_binary(p.listType, &listSize, dummyCount, f.list_stride, _is); // the list size (does not count for memory alloc)
             return read_property_binary(p.propertyType, f.prop_stride * listSize, scratch, dummyCount, _is);
         };
     }
