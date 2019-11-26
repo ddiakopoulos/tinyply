@@ -49,6 +49,8 @@ namespace tinyply
 
     struct PropertyInfo
     {
+        PropertyInfo(const uint32_t stride, const std::string & str)
+            : stride(stride), str(str) {}
         uint32_t stride {0};
         std::string str;
     };
