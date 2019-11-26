@@ -49,23 +49,24 @@ namespace tinyply
 
     struct PropertyInfo
     {
-        PropertyInfo(const uint32_t stride, const std::string & str)
+        PropertyInfo() {};
+        PropertyInfo(int stride, std::string str)
             : stride(stride), str(str) {}
-        uint32_t stride {0};
+        int stride {0};
         std::string str;
     };
 
     static std::map<Type, PropertyInfo> PropertyTable
     {
-        { Type::INT8,    PropertyInfo{ 1, std::string("char") } },
-        { Type::UINT8,   PropertyInfo{ 1, std::string("uchar") } },
-        { Type::INT16,   PropertyInfo{ 2, std::string("short") } },
-        { Type::UINT16,  PropertyInfo{ 2, std::string("ushort") } },
-        { Type::INT32,   PropertyInfo{ 4, std::string("int") } },
-        { Type::UINT32,  PropertyInfo{ 4, std::string("uint") } },
-        { Type::FLOAT32, PropertyInfo{ 4, std::string("float") } },
-        { Type::FLOAT64, PropertyInfo{ 8, std::string("double") } },
-        { Type::INVALID, PropertyInfo{ 0, std::string("INVALID") } }
+        { Type::INT8,    PropertyInfo(1, std::string("char")) },
+        { Type::UINT8,   PropertyInfo(1, std::string("uchar")) },
+        { Type::INT16,   PropertyInfo(2, std::string("short")) },
+        { Type::UINT16,  PropertyInfo(2, std::string("ushort")) },
+        { Type::INT32,   PropertyInfo(4, std::string("int")) },
+        { Type::UINT32,  PropertyInfo(4, std::string("uint")) },
+        { Type::FLOAT32, PropertyInfo(4, std::string("float")) },
+        { Type::FLOAT64, PropertyInfo(8, std::string("double")) },
+        { Type::INVALID, PropertyInfo(0, std::string("INVALID"))}
     };
 
     class Buffer
