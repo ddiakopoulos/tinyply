@@ -49,21 +49,21 @@ namespace tinyply
 
     struct PropertyInfo
     {
-        int stride {0};
+        uint32_t stride {0};
         std::string str;
     };
 
     static std::map<Type, PropertyInfo> PropertyTable
     {
-        { Type::INT8,    { 1, "char" } },
-        { Type::UINT8,   { 1, "uchar" } },
-        { Type::INT16,   { 2, "short" } },
-        { Type::UINT16,  { 2, "ushort" } },
-        { Type::INT32,   { 4, "int" } },
-        { Type::UINT32,  { 4, "uint" } },
-        { Type::FLOAT32, { 4, "float" } },
-        { Type::FLOAT64, { 8, "double" } },
-        { Type::INVALID, { 0, "INVALID" } }
+        { Type::INT8,    PropertyInfo{ 1, "char" } },
+        { Type::UINT8,   PropertyInfo{ 1, "uchar" } },
+        { Type::INT16,   PropertyInfo{ 2, "short" } },
+        { Type::UINT16,  PropertyInfo{ 2, "ushort" } },
+        { Type::INT32,   PropertyInfo{ 4, "int" } },
+        { Type::UINT32,  PropertyInfo{ 4, "uint" } },
+        { Type::FLOAT32, PropertyInfo{ 4, "float" } },
+        { Type::FLOAT64, PropertyInfo{ 8, "double" } },
+        { Type::INVALID, PropertyInfo{ 0, "INVALID" } }
     };
 
     class Buffer
