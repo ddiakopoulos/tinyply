@@ -679,19 +679,31 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
         for (auto key : propertyKeys)
         {
             const int64_t propertyIndex = find_property(key, element.properties);
-            if (propertyIndex >= 0)
+            // The key was not found
+            if (propertyIndex < 0)
             {
-                // We found the property
-                const PlyProperty & property = element.properties[propertyIndex];
-                helper.data->t = property.propertyType;
-                helper.data->isList = property.isList;
-                auto result = userData.insert(std::pair<uint32_t, ParsingHelper>(hash_fnv1a(element.name + property.name), helper));
-                if (result.second == false)
-                {
-                    throw std::invalid_argument("element-property key has already been requested: " + hash_fnv1a(element.name + property.name));
-                }
+                keys_not_found.push_back(key);
             }
-            else keys_not_found.push_back(key);
+        }
+
+        if (keys_not_found.size())
+        {
+            std::stringstream ss;
+            for (auto & str : keys_not_found) ss << str << ", ";
+            throw std::invalid_argument("the following property keys were not found in the header: " + ss.str());
+        }
+
+        for (auto key : propertyKeys)
+        {
+            const int64_t propertyIndex = find_property(key, element.properties);
+            const PlyProperty & property = element.properties[propertyIndex];
+            helper.data->t = property.propertyType;
+            helper.data->isList = property.isList;
+            auto result = userData.insert(std::pair<uint32_t, ParsingHelper>(hash_fnv1a(element.name + property.name), helper));
+            if (result.second == false)
+            {
+                throw std::invalid_argument("element-property key has already been requested: " + element.name + " " + property.name);
+            }
         }
     }
     else throw std::invalid_argument("the element key was not found in the header: " + elementKey);
