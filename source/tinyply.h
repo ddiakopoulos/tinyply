@@ -426,7 +426,7 @@ size_t PlyFile::PlyFileImpl::read_property_ascii(const Type & t, const size_t & 
     destOffset += stride;
     switch (t)
     {
-    case Type::INT8:       *((int8_t *)dest) = ply_read_ascii<int32_t>(is);   break;
+    case Type::INT8:       *((int8_t *)dest)  = ply_read_ascii<int32_t>(is);  break;
     case Type::UINT8:      *((uint8_t *)dest) = ply_read_ascii<uint32_t>(is); break;
     case Type::INT16:      ply_cast_ascii<int16_t>(dest, is);                 break;
     case Type::UINT16:     ply_cast_ascii<uint16_t>(dest, is);                break;
@@ -531,7 +531,7 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
             case Type::UINT32:  endian_swap_buffer<uint32_t, uint32_t>(data_ptr, buffer_size_bytes, stride); break;
             case Type::FLOAT32: endian_swap_buffer<uint32_t, float>(data_ptr, buffer_size_bytes, stride);    break;
             case Type::FLOAT64: endian_swap_buffer<uint64_t, double>(data_ptr, buffer_size_bytes, stride);   break;
-            default:break;
+            default: break;
             }
         }
     }
@@ -539,8 +539,8 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
 
 void PlyFile::PlyFileImpl::write(std::ostream & os, bool _isBinary)
 {
-	// reset cursors
-	for (auto & d : userData) { d.second.cursor->byteOffset = 0; }
+    // reset cursors
+    for (auto & d : userData) { d.second.cursor->byteOffset = 0; }
     if (_isBinary) write_binary_internal(os);
     else write_ascii_internal(os);
 }
