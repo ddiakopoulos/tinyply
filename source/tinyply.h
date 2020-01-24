@@ -278,6 +278,10 @@ struct PlyFile::PlyFileImpl
     size_t read_property_binary(const Type & t, const size_t & stride, void * dest, size_t & destOffset, std::istream & is);
     size_t read_property_ascii(const Type & t, const size_t & stride, void * dest, size_t & destOffset, std::istream & is);
 
+    // The `userData` table is an easy data structure for capturing what data the
+    // user would like out of the ply file, but an inner-loop hash lookup is non-ideal. 
+    // The property lookup table flattens the table down into a 2D array optimized
+    // for parsing. The first index is the element, and the second index is the property. 
     std::vector<std::vector<PropertyLookup>> make_property_lookup_table()
     {
         std::vector<std::vector<PropertyLookup>> element_property_lookup;
@@ -477,7 +481,10 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
     for (auto & b : buffers) for (auto & entry : userData) {list_hints += entry.second.list_size_hint;(void)b;}
 
     // No list hints? Then we need to calculate how much memory to allocate
-    if (list_hints == 0) parse_data(is, true);
+    if (list_hints == 0) 
+    {
+        parse_data(is, true);
+    }
 
     // Count the number of properties (required for allocation)
     // e.g. if we have properties x y and z requested, we ensure
@@ -811,7 +818,9 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
                 return f.prop_stride;
             }
             read_list_binary(p.listType, &listSize, dummyCount, f.list_stride, _is); // the list size (does not count for memory alloc)
-            return read_property_binary(p.propertyType, f.prop_stride * listSize, scratch, dummyCount, _is);
+            const size_t skip_this_many_bytes = f.prop_stride * listSize;
+            _is.seekg(_is.cur + skip_this_many_bytes);
+            return skip_this_many_bytes;
         };
     }
     else
@@ -857,20 +866,30 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
             for (auto & property : element.properties)
             {
                 auto & f = element_property_lookup[element_idx][property_index];
+
                 if (!f.skip)
                 {
                     auto * helper = f.helper;
-                    if (firstPass) helper->cursor->totalSizeBytes += skip(f, property, is);
-                    else read(f, property, helper->data->buffer.get(), helper->cursor->byteOffset, is);
+                    if (firstPass) 
+                    {
+                        helper->cursor->totalSizeBytes += skip(f, property, is);
+                    }
+                    else 
+                    {
+                        read(f, property, helper->data->buffer.get(), helper->cursor->byteOffset, is);
+                    }
                 }
-                else skip(f, property, is);
+                else 
+                {
+                    skip(f, property, is);
+                }
                 property_index++;
             }
         }
         element_idx++;
     }
 
-    // Reset istream reader to the beginning
+    // Reset istream position to the start of the data
     if (firstPass) is.seekg(start, is.beg);
 }
 
