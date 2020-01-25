@@ -4,6 +4,11 @@
 // https://github.com/ddiakopoulos/tinyply
 // Version 2.3
 
+// The purpose of this file is to demonstrate the tinyply API and provide several almost-complete
+// functions that can be copied and pasted into your own application or library. Because tinyply
+// treats the file format as structured data, it's up to you to copy or move the parsed data
+// into your application-specific data structures (e.g. float3, vec3, etc). 
+
 #include <thread>
 #include <chrono>
 #include <vector>
@@ -16,7 +21,7 @@
 #include "tinyply.h"
 using namespace tinyply;
 
-inline std::vector<uint8_t> read_file_binary(const std::string& pathToFile)
+inline std::vector<uint8_t> read_file_binary(const std::string & pathToFile)
 {
     std::ifstream file(pathToFile, std::ios::binary);
     std::vector<uint8_t> fileBufferBytes;
@@ -35,17 +40,33 @@ inline std::vector<uint8_t> read_file_binary(const std::string& pathToFile)
 
 struct memory_buffer : public std::streambuf
 {
-    memory_buffer(char const * base, size_t size)
+    char * p_start {nullptr};
+    char * p_end {nullptr};
+    size_t size;
+
+    memory_buffer(char const * first_elem, size_t size)
+        : p_start(const_cast<char*>(first_elem)), p_end(p_start + size), size(size)
     {
-        char * p(const_cast<char*>(base));
-        this->setg(p, p, p + size);
+        setg(p_start, p_start, p_end);
+    }
+
+    pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) override
+    {
+        if (dir == std::ios_base::cur) gbump(static_cast<int>(off));
+        else setg(p_start, (dir == std::ios_base::beg ? p_start : p_end) + off, p_end);
+        return gptr() - p_start;
+    }
+
+    pos_type seekpos(pos_type pos, std::ios_base::openmode which) override
+    {
+        return seekoff(pos, std::ios_base::beg, which);
     }
 };
 
 struct memory_stream : virtual memory_buffer, public std::istream
 {
-    memory_stream(char const* base, size_t size) 
-        : memory_buffer(base, size), std::istream(static_cast<std::streambuf*>(this)) {}
+    memory_stream(char const * first_elem, size_t size)
+        : memory_buffer(first_elem, size), std::istream(static_cast<std::streambuf*>(this)) {}
 };
 
 class manual_timer
@@ -161,26 +182,28 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
             file_stream.reset(new std::ifstream(filepath, std::ios::binary));
         }
 
-        if (!file_stream || file_stream->fail()) throw std::runtime_error("failed to open " + filepath);
+        if (!file_stream || file_stream->fail()) throw std::runtime_error("file_stream failed to open " + filepath);
 
         PlyFile file;
         file.parse_header(*file_stream);
 
-        for (const auto & c : file.get_comments())
-        {
-            std::cout << "\t[Header] Comment: " << c << std::endl;
-        }
+        for (const auto & c : file.get_comments()) std::cout << "\t[ply_header] Comment: " << c << std::endl;
+        for (const auto & c : file.get_info()) std::cout << "\t[ply_header] Info: " << c << std::endl;
+
         for (const auto & e : file.get_elements())
         {
-            std::cout << "\t[Header] element - " << e.name << " (" << e.size << ")" << std::endl;
+            std::cout << "\t[ply_header] element: " << e.name << " (" << e.size << ")" << std::endl;
             for (const auto & p : e.properties)
             {
-                std::cout << "\t[Header] \tproperty - " << p.name << " (" << tinyply::PropertyTable[p.propertyType].str << ")" << std::endl;
+                std::cout << "\t[ply_header] \tproperty: " << p.name << " (type=" << tinyply::PropertyTable[p.propertyType].str << ")";
+                if (p.isList) std::cout << " (list_type=" << tinyply::PropertyTable[p.listType].str << ")";
+                std::cout << std::endl;
             }
         }
 
-        // Tinyply treats parsed data as untyped byte buffers. See below for examples.
-        std::shared_ptr<PlyData> vertices, normals, faces, texcoords;
+        // Because most people have their own mesh types, tinyply treats parsed data as structured/typed byte buffers. 
+        // See examples below on how to marry your own application-specific data structures with this one. 
+        std::shared_ptr<PlyData> vertices, normals, colors, texcoords, faces, tripstrip;
 
         // The header information can be used to programmatically extract properties on elements
         // known to exist in the header prior to reading the data. For brevity of this sample, properties 
@@ -191,12 +214,23 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
         try { normals = file.request_properties_from_element("vertex", { "nx", "ny", "nz" }); }
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
+        try { colors = file.request_properties_from_element("vertex", { "red", "green", "blue", "alpha" }); }
+        catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+
+        try { colors = file.request_properties_from_element("vertex", { "r", "g", "b", "a" }); }
+        catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+
         try { texcoords = file.request_properties_from_element("vertex", { "u", "v" }); }
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
         // Providing a list size hint (the last argument) is a 2x performance improvement. If you have 
         // arbitrary ply files, it is best to leave this 0. 
         try { faces = file.request_properties_from_element("face", { "vertex_indices" }, 3); }
+        catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+
+        // Tristrips must always be read with a 0 list size hint (unless you know exactly how many elements
+        // are specifically in the file, which is unlikely); 
+        try { tripstrip = file.request_properties_from_element("tristrips", { "vertex_indices" }, 0); }
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
         manual_timer read_timer;
@@ -206,19 +240,22 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
         read_timer.stop();
 
         std::cout << "Reading took " << read_timer.get() / 1000.f << " seconds." << std::endl;
-        if (vertices) std::cout << "\tRead " << vertices->count << " total vertices "<< std::endl;
-        if (normals) std::cout << "\tRead " << normals->count << " total vertex normals " << std::endl;
-        if (texcoords) std::cout << "\tRead " << texcoords->count << " total vertex texcoords " << std::endl;
-        if (faces) std::cout << "\tRead " << faces->count << " total faces (triangles) " << std::endl;
 
-        // type casting to your own native types - Option A
+        if (vertices)   std::cout << "\tRead " << vertices->count  << " total vertices "<< std::endl;
+        if (normals)    std::cout << "\tRead " << normals->count   << " total vertex normals " << std::endl;
+        if (colors)     std::cout << "\tRead " << colors->count << " total vertex colors " << std::endl;
+        if (texcoords)  std::cout << "\tRead " << texcoords->count << " total vertex texcoords " << std::endl;
+        if (faces)      std::cout << "\tRead " << faces->count     << " total faces (triangles) " << std::endl;
+        if (tripstrip)  std::cout << "\tRead " << (tripstrip->buffer.size_bytes() / tinyply::PropertyTable[tripstrip->t].stride) << " total indicies (tristrip) " << std::endl;
+
+        // Example One: converting to your own application types
         {
             const size_t numVerticesBytes = vertices->buffer.size_bytes();
             std::vector<float3> verts(vertices->count);
             std::memcpy(verts.data(), vertices->buffer.get(), numVerticesBytes);
         }
 
-        // type casting to your own native types - Option B
+        // Example Two: converting to your own application type
         {
             std::vector<float3> verts_floats;
             std::vector<double3> verts_doubles;
@@ -235,23 +272,9 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
 int main(int argc, char *argv[])
 {
     // Circular write-read
-    //write_ply_example("example_cube");
-    //read_ply_file("example_cube-ascii.ply");
-    //read_ply_file("example_cube-binary.ply");
-    //
-    //// Validation (small files)
-    //read_ply_file("../assets/icosahedron.ply", true);
-    //read_ply_file("../assets/icosahedron_ascii.ply", true);
-    //read_ply_file("../assets/sofa.ply", true);
-    //read_ply_file("../assets/sofa_ascii.ply", true);
-
-    //read_ply_file("../assets/bunny.ply", true);
-
-    read_ply_file("../assets/elephant.ply", true);
-    //
-    //// Validation (large files)
-    //read_ply_file("../assets/xyzrgb_dragon.ply", true);
-    //read_ply_file("../assets/lucy.ply", true);
+    write_ply_example("example_cube");
+    read_ply_file("example_cube-ascii.ply");
+    read_ply_file("example_cube-binary.ply", true);
 
     return EXIT_SUCCESS;
 }
