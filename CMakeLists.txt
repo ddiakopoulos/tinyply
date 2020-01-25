@@ -6,9 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 project(tinyply LANGUAGES CXX)
-set(PROJECT_VERSION 2.2)
+set(PROJECT_VERSION 2.3)
 
 include_directories("${CMAKE_SOURCE_DIR}/source")
+include_directories("${CMAKE_SOURCE_DIR}/third-party")
 
 set(CMAKE_DEBUG_POSTFIX "d")
 
@@ -21,9 +22,13 @@ else()
     add_library(tinyply STATIC source/tinyply.cpp source/tinyply.h)
 endif()
 
-# Example
+# Example Application
 add_executable(example source/example.cpp)
 target_link_libraries(example PRIVATE tinyply)
+
+# Test Application
+add_executable(tests source/tests.cpp)
+target_link_libraries(tests PRIVATE tinyply)
 
 # pkg-config support
 set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
