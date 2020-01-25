@@ -144,11 +144,12 @@ namespace tinyply
 
         /* 
          * These functions are valid after a call to `parse_header(...)`. In the case of
-         * writing, get_comments() may also be used to add new comments to the ply header.
+         * writing, get_comments() reference may also be used to add new comments to the ply header.
          */
         std::vector<PlyElement> get_elements() const;
         std::vector<std::string> get_info() const;
         std::vector<std::string> & get_comments();
+        bool is_binary_file() const;
 
         /*
          * In the general case where |list_size_hint| is zero, `read` performs a two-pass
@@ -903,6 +904,7 @@ void PlyFile::write(std::ostream & os, bool isBinary) { return impl->write(os, i
 std::vector<PlyElement> PlyFile::get_elements() const { return impl->elements; }
 std::vector<std::string> & PlyFile::get_comments() { return impl->comments; }
 std::vector<std::string> PlyFile::get_info() const { return impl->objInfo; }
+bool PlyFile::is_binary_file() const { return impl->isBinary; }
 std::shared_ptr<PlyData> PlyFile::request_properties_from_element(const std::string & elementKey,
     const std::initializer_list<std::string> propertyKeys,
     const uint32_t list_size_hint)

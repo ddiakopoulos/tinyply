@@ -187,6 +187,7 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
         PlyFile file;
         file.parse_header(*file_stream);
 
+        std::cout << "\t[ply_header] Type: " << (file.is_binary_file() ? "binary" : "ascii") << std::endl;
         for (const auto & c : file.get_comments()) std::cout << "\t[ply_header] Comment: " << c << std::endl;
         for (const auto & c : file.get_info()) std::cout << "\t[ply_header] Info: " << c << std::endl;
 
