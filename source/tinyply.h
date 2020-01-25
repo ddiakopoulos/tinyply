@@ -159,10 +159,10 @@ namespace tinyply
          * memory allocation and a single-pass import, a 2x performance optimization.
          */
         std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey, 
-            const std::initializer_list<std::string> propertyKeys, const uint32_t list_size_hint = 0);
+            const std::vector<std::string> propertyKeys, const uint32_t list_size_hint = 0);
 
         void add_properties_to_element(const std::string & elementKey, 
-            const std::initializer_list<std::string> propertyKeys, 
+            const std::vector<std::string> propertyKeys, 
             const Type type, 
             const size_t count, 
             uint8_t * data, 
@@ -269,11 +269,11 @@ struct PlyFile::PlyFileImpl
     void write(std::ostream & os, bool isBinary);
 
     std::shared_ptr<PlyData> request_properties_from_element(const std::string & elementKey,
-        const std::initializer_list<std::string> propertyKeys,
+        const std::vector<std::string> propertyKeys,
         const uint32_t list_size_hint);
 
     void add_properties_to_element(const std::string & elementKey,
-        const std::initializer_list<std::string> propertyKeys,
+        const std::vector<std::string> propertyKeys,
         const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount);
 
     size_t read_property_binary(const Type & t, const size_t & stride, void * dest, size_t & destOffset, std::istream & is);
@@ -382,6 +382,7 @@ int64_t find_property(const std::string & key, const std::vector<PlyProperty> & 
 bool PlyFile::PlyFileImpl::parse_header(std::istream & is)
 {
     std::string line;
+    bool success = true;
     while (std::getline(is, line))
     {
         std::istringstream ls(line);
@@ -394,9 +395,9 @@ bool PlyFile::PlyFileImpl::parse_header(std::istream & is)
         else if (token == "property")   read_header_property(ls);
         else if (token == "obj_info")   read_header_text(line, ls, objInfo, 9);
         else if (token == "end_header") break;
-        else return false; // unexpected header field
+        else success = false; // unexpected header field
     }
-    return true;
+    return success;
 }
 
 void PlyFile::PlyFileImpl::read_header_text(std::string line, std::istream & is, std::vector<std::string>& place, int erase)
@@ -655,7 +656,7 @@ void PlyFile::PlyFileImpl::write_header(std::ostream & os)
 }
 
 std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(const std::string & elementKey,
-    const std::initializer_list<std::string> propertyKeys,
+    const std::vector<std::string> propertyKeys,
     const uint32_t list_size_hint)
 {
     // Each key in `propertyKey` gets an entry into the userData map (keyed by a hash of
@@ -730,7 +731,7 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
 }
 
 void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & elementKey, 
-    const std::initializer_list<std::string> propertyKeys, 
+    const std::vector<std::string> propertyKeys, 
     const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount)
 {
     ParsingHelper helper;
@@ -906,13 +907,13 @@ std::vector<std::string> & PlyFile::get_comments() { return impl->comments; }
 std::vector<std::string> PlyFile::get_info() const { return impl->objInfo; }
 bool PlyFile::is_binary_file() const { return impl->isBinary; }
 std::shared_ptr<PlyData> PlyFile::request_properties_from_element(const std::string & elementKey,
-    const std::initializer_list<std::string> propertyKeys,
+    const std::vector<std::string> propertyKeys,
     const uint32_t list_size_hint)
 {
     return impl->request_properties_from_element(elementKey, propertyKeys, list_size_hint);
 }
 void PlyFile::add_properties_to_element(const std::string & elementKey,
-    const std::initializer_list<std::string> propertyKeys,
+    const std::vector<std::string> propertyKeys,
     const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount)
 {
     return impl->add_properties_to_element(elementKey, propertyKeys, type, count, data, listType, listCount);

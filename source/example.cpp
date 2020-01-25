@@ -75,6 +75,10 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
 
         if (!file_stream || file_stream->fail()) throw std::runtime_error("file_stream failed to open " + filepath);
 
+        file_stream->seekg(0, std::ios::end);
+        const float size_mb = file_stream->tellg() * float(1e-6);
+        file_stream->seekg(0, std::ios::beg);
+
         PlyFile file;
         file.parse_header(*file_stream);
 
@@ -131,7 +135,8 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
         file.read(*file_stream);
         read_timer.stop();
 
-        std::cout << "Reading took " << read_timer.get() / 1000.f << " seconds." << std::endl;
+        const float parsing_time = read_timer.get() / 1000.f;
+        std::cout << "\tparsing " << size_mb << "mb in " << parsing_time << " seconds [" << (size_mb / parsing_time) << " MBps]" << std::endl;
 
         if (vertices)   std::cout << "\tRead " << vertices->count  << " total vertices "<< std::endl;
         if (normals)    std::cout << "\tRead " << normals->count   << " total vertex normals " << std::endl;
