@@ -99,10 +99,10 @@ namespace tinyply
         PlyProperty(Type list_type, Type prop_type, std::string & _name, size_t list_count) 
             : name(_name), propertyType(prop_type), isList(true), listType(list_type), listCount(list_count) {}
         std::string name;
-        Type propertyType;
+        Type propertyType{ Type::INVALID };
         bool isList{ false };
         Type listType{ Type::INVALID };
-        size_t listCount{ 0 };
+        size_t listCount {0};
     };
 
     struct PlyElement
@@ -820,7 +820,7 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
             read_list_binary(p.listType, &listSize, dummyCount, f.list_stride, _is); // the list size (does not count for memory alloc)
             const size_t skip_this_many_bytes = f.prop_stride * listSize;
             _is.seekg(_is.cur + skip_this_many_bytes);
-            return skip_this_many_bytes;
+            return skip_this_many_bytes; // the properties in the list
         };
     }
     else
