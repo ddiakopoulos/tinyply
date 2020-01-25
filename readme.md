@@ -17,7 +17,7 @@ The project comes with a simple example program demonstrating a circular write /
 
 ## In The Wild
 
-Since 2015, tinyply has been used in hundreds of open-source projects including pointcloud tools, raytracers, synthetic data renderers, computational geometry libraries, and more. A projects are highlighted below: 
+Since 2015, tinyply has been used in hundreds of open-source projects including pointcloud tools, raytracers, synthetic data renderers, computational geometry libraries, and more. A few notable projects are highlighted below: 
 
 * [Maplab](https://github.com/ethz-asl/maplab) from ETH Zürich, a research-oriented visual-inertial mapping framework. 
 * [glChAoS.P](https://github.com/BrutPitt/glChAoS.P) from Michele Morrone, a rendering sandbox for 3D strange attractors.
