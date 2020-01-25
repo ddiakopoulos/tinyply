@@ -11,14 +11,6 @@ A single-header, zero-dependency (except the C++ STL) __public domain__ implemen
 
 The library is written in C++11 and requires a recent compiler (GCC 4.8+ / VS2015+ / Clang 2.9+). Tinyply supports exporting and importing PLY files in both binary and ascii formats. Tinyply supports filesizes >= 4gb and can read big-endian binary files (but not write them). 
 
-Version 2.0 is an API re-write to support later improvements towards variable length lists. One notable change is that tinyply now produces and consumes structured byte arrays, with type information held as metadata.
-
-Version 2.1 contained minor bugfixes and speed improvements.
-
-Version 2.2 is a rewrite of the inner read/write loop. Compared to tinyply 2.0, this version reads and writes binary about five times faster. When a list size hint is given for reading, the performance is approximately comparable to rply. 
-
-Version 2.3 contains minor bugfixes and performance improvements. A feature of the example application includes the ability to pre-load files into memory for improved runtime parsing performance on many files. 
-
 ## Getting Started
 
 The project comes with a simple example program demonstrating a circular write / read and all of the major API functionality. 
@@ -38,6 +30,13 @@ tinyply not what you're looking for? tinyply trades some performance for simplic
 
 * Vilya Harvey's [ply-parsing-perf](https://github.com/vilya/ply-parsing-perf)
 * Maciej Halber's [ply_io_benchmark](https://github.com/mhalber/ply_io_benchmark)
+
+## Past Versions
+
+* `version 2.0` is an API re-write to support later improvements towards variable length lists. One notable change is that tinyply now produces and consumes structured byte arrays, with type information held as metadata.
+* `version 2.1` contained minor bugfixes and speed improvements.
+* `version 2.2` is a rewrite of the inner read/write loop. Compared to `version 2.0`, this version reads and writes binary about five times faster. When a list size hint is given for reading, the performance is approximately comparable to rply. 
+* `version 2.3` contains minor bugfixes and performance improvements. A feature of the example application includes the ability to pre-load files into memory for improved runtime parsing performance on many files. 
 
 ## License
 
