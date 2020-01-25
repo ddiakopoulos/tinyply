@@ -1,6 +1,6 @@
-# tinyply 2.2
+# tinyply 2.3
 
-[![Release is 2.2](http://img.shields.io/badge/release-2.2-blue.svg?style=flat)](https://raw.githubusercontent.com/ddiakopoulos/tinyply/master/source/tinyply.h)
+[![Release is 2.3](http://img.shields.io/badge/release-2.2-blue.svg?style=flat)](https://raw.githubusercontent.com/ddiakopoulos/tinyply/master/source/tinyply.h)
 [![License is Unlicense](http://img.shields.io/badge/license-Unlicense-blue.svg?style=flat)](http://unlicense.org/)
 
 Platform | Build Status |
@@ -16,6 +16,8 @@ Version 2.0 is mostly an API re-write to support later improvements towards vari
 Version 2.1 contained minor bugfixes and speed improvements.
 
 Version 2.2 is a rewrite of the inner read/write loop. Compared to tinyply 2.0, this version reads and writes binary about five times faster. When a list size hint is given for reading, the performance is approximately comparable to rply. 
+
+Version 2.3 contains minor bugfixes and performance improvements. A feature of the example application includes the ability to pre-load files into memory for improved runtime parsing performance on many files. 
 
 ## Getting Started
 
