@@ -278,7 +278,7 @@ struct PlyFile::PlyFileImpl
         const std::vector<std::string> propertyKeys,
         const Type type, const size_t count, uint8_t * data, const Type listType, const size_t listCount);
 
-    size_t read_property_binary(const Type & t, const size_t & stride, void * dest, size_t & destOffset, std::istream & is);
+    size_t read_property_binary(const size_t & stride, void * dest, size_t & destOffset, std::istream & is);
     size_t read_property_ascii(const Type & t, const size_t & stride, void * dest, size_t & destOffset, std::istream & is);
 
     // The `userData` table is an easy data structure for capturing what data the
@@ -318,13 +318,13 @@ struct PlyFile::PlyFileImpl
     void read_header_format(std::istream & is);
     void read_header_element(std::istream & is);
     void read_header_property(std::istream & is);
-    void read_header_text(std::string line, std::istream & is, std::vector<std::string> & place, int erase = 0);
+    void read_header_text(std::string line, std::vector<std::string> & place, int erase = 0);
 
     void write_header(std::ostream & os);
     void write_ascii_internal(std::ostream & os);
     void write_binary_internal(std::ostream & os);
     void write_property_ascii(Type t, std::ostream & os, uint8_t * src, size_t & srcOffset);
-    void write_property_binary(Type t, std::ostream & os, uint8_t * src, size_t & srcOffset, const size_t & stride);
+    void write_property_binary(std::ostream & os, uint8_t * src, size_t & srcOffset, const size_t & stride);
 };
 
 PlyProperty::PlyProperty(std::istream & is) : isList(false)
@@ -391,18 +391,18 @@ bool PlyFile::PlyFileImpl::parse_header(std::istream & is)
         std::string token;
         ls >> token;
         if (token == "ply" || token == "PLY" || token == "") continue;
-        else if (token == "comment")    read_header_text(line, ls, comments, 8);
+        else if (token == "comment")    read_header_text(line, comments, 8);
         else if (token == "format")     read_header_format(ls);
         else if (token == "element")    read_header_element(ls);
         else if (token == "property")   read_header_property(ls);
-        else if (token == "obj_info")   read_header_text(line, ls, objInfo, 9);
+        else if (token == "obj_info")   read_header_text(line, objInfo, 9);
         else if (token == "end_header") break;
         else success = false; // unexpected header field
     }
     return success;
 }
 
-void PlyFile::PlyFileImpl::read_header_text(std::string line, std::istream & is, std::vector<std::string>& place, int erase)
+void PlyFile::PlyFileImpl::read_header_text(std::string line, std::vector<std::string>& place, int erase)
 {
     place.push_back((erase > 0) ? line.erase(0, erase) : line);
 }
@@ -426,7 +426,7 @@ void PlyFile::PlyFileImpl::read_header_property(std::istream & is)
     elements.back().properties.emplace_back(is);
 }
 
-size_t PlyFile::PlyFileImpl::read_property_binary(const Type & t, const size_t & stride, void * dest, size_t & destOffset, std::istream & is)
+size_t PlyFile::PlyFileImpl::read_property_binary(const size_t & stride, void * dest, size_t & destOffset, std::istream & is)
 {
     destOffset += stride;
     is.read((char*)dest, stride);
@@ -438,8 +438,8 @@ size_t PlyFile::PlyFileImpl::read_property_ascii(const Type & t, const size_t & 
     destOffset += stride;
     switch (t)
     {
-    case Type::INT8:       *((int8_t *)dest)  = ply_read_ascii<int32_t>(is);  break;
-    case Type::UINT8:      *((uint8_t *)dest) = ply_read_ascii<uint32_t>(is); break;
+    case Type::INT8:       *((int8_t *)dest)  = static_cast<int8_t>(ply_read_ascii<int32_t>(is));   break;
+    case Type::UINT8:      *((uint8_t *)dest) = static_cast<uint8_t>(ply_read_ascii<uint32_t>(is)); break;
     case Type::INT16:      ply_cast_ascii<int16_t>(dest, is);                 break;
     case Type::UINT16:     ply_cast_ascii<uint16_t>(dest, is);                break;
     case Type::INT32:      ply_cast_ascii<int32_t>(dest, is);                 break;
@@ -469,7 +469,7 @@ void PlyFile::PlyFileImpl::write_property_ascii(Type t, std::ostream & os, uint8
     srcOffset += PropertyTable[t].stride;
 }
 
-void PlyFile::PlyFileImpl::write_property_binary(Type t, std::ostream & os, uint8_t * src, size_t & srcOffset, const size_t & stride)
+void PlyFile::PlyFileImpl::write_property_binary(std::ostream & os, uint8_t * src, size_t & srcOffset, const size_t & stride)
 {
     os.write((char *)src, stride);
     srcOffset += stride;
@@ -584,12 +584,12 @@ void PlyFile::PlyFileImpl::write_binary_internal(std::ostream & os)
                 if (p.isList)
                 {
                     std::memcpy(listSize, &p.listCount, sizeof(uint32_t));
-                    write_property_binary(p.listType, os, listSize, dummyCount, f.list_stride);
-                    write_property_binary(p.propertyType, os, (helper->data->buffer.get() + helper->cursor->byteOffset), helper->cursor->byteOffset, f.prop_stride * p.listCount);
+                    write_property_binary(os, listSize, dummyCount, f.list_stride);
+                    write_property_binary(os, (helper->data->buffer.get() + helper->cursor->byteOffset), helper->cursor->byteOffset, f.prop_stride * p.listCount);
                 }
                 else
                 {
-                    write_property_binary(p.propertyType, os, (helper->data->buffer.get() + helper->cursor->byteOffset), helper->cursor->byteOffset, f.prop_stride);
+                    write_property_binary(os, (helper->data->buffer.get() + helper->cursor->byteOffset), helper->cursor->byteOffset, f.prop_stride);
                 }
                 property_index++;
             }
@@ -817,10 +817,10 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
         {
             if (!p.isList)
             {
-                read_property_binary(p.propertyType, f.prop_stride, dest + destOffset, destOffset, _is);
+                read_property_binary(f.prop_stride, dest + destOffset, destOffset, _is);
             }
             read_list_binary(p.listType, &listSize, dummyCount, f.list_stride, _is); // the list size
-            read_property_binary(p.propertyType, f.prop_stride * listSize, dest + destOffset, destOffset, _is); // properties in list
+            read_property_binary(f.prop_stride * listSize, dest + destOffset, destOffset, _is); // properties in list
         };
         skip = [this, &listSize, &dummyCount, &read_list_binary](PropertyLookup & f, const PlyProperty & p, std::istream & _is)
         {
