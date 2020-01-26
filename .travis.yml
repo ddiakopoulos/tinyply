@@ -30,4 +30,5 @@ install:
 script:
   - mkdir tinyply_build
   - cd tinyply_build
+  - cmake ..
   - cmake --build .
