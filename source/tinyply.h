@@ -11,9 +11,9 @@
  * Authored by Dimitri Diakopoulos (http://www.dimitridiakopoulos.com)
  *
  * tinyply.h may be included in many files, however in a single compiled file,
- * the implementation must be created with the following defined
- * before including the header.
+ * the implementation must be created with the following defined prior to header inclusion
  * #define TINYPLY_IMPLEMENTATION
+ * 
  */
 
 ////////////////////////
@@ -781,6 +781,8 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
     const auto start = is.tellg();
 
     size_t listSize = 0;
+    size_t lastListSize = 0;
+
     size_t dummyCount = 0;
     std::string skip_ascii_buffer;
 
@@ -864,36 +866,40 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
         };
     }
 
-    auto element_property_lookup = make_property_lookup_table();
-
+    std::vector<std::vector<PropertyLookup>> element_property_lookup = make_property_lookup_table();
     size_t element_idx = 0;
-    size_t property_index = 0;
+    size_t property_idx = 0;
+    ParsingHelper * helper {nullptr};
+
+    // This is the inner import loop
     for (auto & element : elements)
     {
         for (size_t count = 0; count < element.size; ++count)
         {
-            property_index = 0;
+            property_idx = 0;
             for (auto & property : element.properties)
             {
-                auto & f = element_property_lookup[element_idx][property_index];
+                PropertyLookup & lookup = element_property_lookup[element_idx][property_idx];
 
-                if (!f.skip)
+                if (!lookup.skip)
                 {
-                    auto * helper = f.helper;
+                    helper = lookup.helper;
                     if (firstPass) 
                     {
-                        helper->cursor->totalSizeBytes += skip(f, property, is);
+                        lastListSize = listSize;
+                        helper->cursor->totalSizeBytes += skip(lookup, property, is);
+                        if (lastListSize != listSize) throw std::runtime_error("variable length lists are not supported yet");
                     }
                     else 
                     {
-                        read(f, property, helper->data->buffer.get(), helper->cursor->byteOffset, is);
+                        read(lookup, property, helper->data->buffer.get(), helper->cursor->byteOffset, is);
                     }
                 }
                 else 
                 {
-                    skip(f, property, is);
+                    skip(lookup, property, is);
                 }
-                property_index++;
+                property_idx++;
             }
         }
         element_idx++;

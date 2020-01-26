@@ -23,60 +23,67 @@ bool parse_ply_file(const std::string & filepath)
     manual_timer read_timer;
     std::ifstream filestream(filepath, std::ios::binary);
 
-    if (filestream.is_open())
+    try
     {
-        PlyFile file;
-
-        filestream.seekg(0, std::ios::end);
-        const float size_mb = filestream.tellg() * float(1e-6);
-        filestream.seekg(0, std::ios::beg);
-
-        bool header_result = file.parse_header(filestream);
-
-        // All ply files are required to have a vertex element
-        std::unordered_map<std::string, std::shared_ptr<PlyData>> vertex_element;
-
-        std::cout << "testing: " << filepath << " - filetype:" << (file.is_binary_file() ? "binary" : "ascii") << std::endl;
-
-        REQUIRE(file.get_elements().size() > 0);
-
-        for (const auto & e : file.get_elements())
+        if (filestream.is_open())
         {
-            if (e.name == "vertex")
+            PlyFile file;
+
+            filestream.seekg(0, std::ios::end);
+            const float size_mb = filestream.tellg() * float(1e-6);
+            filestream.seekg(0, std::ios::beg);
+
+            bool header_result = file.parse_header(filestream);
+
+            // All ply files are required to have a vertex element
+            std::unordered_map<std::string, std::shared_ptr<PlyData>> vertex_element;
+
+            std::cout << "testing: " << filepath << " - filetype:" << (file.is_binary_file() ? "binary" : "ascii") << std::endl;
+
+            REQUIRE(file.get_elements().size() > 0);
+
+            for (const auto & e : file.get_elements())
             {
-                REQUIRE(e.properties.size() > 0);
-                for (const auto & p : e.properties)
+                if (e.name == "vertex")
                 {
-                    try { vertex_element[p.name] = file.request_properties_from_element(e.name, { p.name }); }
-                    catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
-                }
-            }
-        }
-
-        read_timer.start();
-        file.read(filestream);
-        read_timer.stop();
-
-        const float parsing_time = read_timer.get() / 1000.f;
-        std::cout << "\tparsing " << size_mb << "mb in " << parsing_time << " seconds [" << (size_mb / parsing_time) << " MBps]" << std::endl;
-
-        for (auto & p : vertex_element)
-        {
-            REQUIRE(p.second->count > 0);
-
-            for (const auto& e : file.get_elements())
-            {
-                for (const auto & prop : e.properties)
-                {
-                    if (prop.name == p.first)
+                    REQUIRE(e.properties.size() > 0);
+                    for (const auto & p : e.properties)
                     {
-                        REQUIRE(e.size == p.second->count);
+                        try { vertex_element[p.name] = file.request_properties_from_element(e.name, { p.name }); }
+                        catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
                     }
                 }
             }
-        }
 
-        return header_result;
+            read_timer.start();
+            file.read(filestream);
+            read_timer.stop();
+
+            const float parsing_time = read_timer.get() / 1000.f;
+            std::cout << "\tparsing " << size_mb << "mb in " << parsing_time << " seconds [" << (size_mb / parsing_time) << " MBps]" << std::endl;
+
+            for (auto & p : vertex_element)
+            {
+                REQUIRE(p.second->count > 0);
+
+                for (const auto& e : file.get_elements())
+                {
+                    for (const auto & prop : e.properties)
+                    {
+                        if (e.name == "vertex" && prop.name == p.first)
+                        {
+                            REQUIRE(e.size == p.second->count);
+                        }
+                    }
+                }
+            }
+
+            return header_result;
+        }
+    } 
+    catch (const std::exception& e)
+    {
+        REQUIRE(FALSE);
     }
 
     return false;
@@ -86,7 +93,6 @@ bool parse_ply_file(const std::string & filepath)
 //   Conformance Tests   //
 ///////////////////////////
 
-/*
 TEST_CASE("importing conformance tests")
 {
     parse_ply_file("../assets/validate/valid/2d.vertex.ply");
@@ -118,9 +124,9 @@ TEST_CASE("importing conformance tests")
     parse_ply_file("../assets/validate/valid/golfball.ply");
     parse_ply_file("../assets/validate/valid/helix.ply");
     parse_ply_file("../assets/validate/valid/heptoroid.ply");
-    parse_ply_file("../assets/validate/valid/kcrane.csaszar.ply"); // Investigate!
+    parse_ply_file("../assets/validate/valid/kcrane.csaszar.ply");
     parse_ply_file("../assets/validate/valid/kcrane.city.ply");
-    parse_ply_file("../assets/validate/valid/kcrane.spot.ply"); // Investigate!
+    parse_ply_file("../assets/validate/valid/kcrane.spot.ply");
     parse_ply_file("../assets/validate/valid/laserdesign.dragon.ply");
     parse_ply_file("../assets/validate/valid/lion.ply");
     parse_ply_file("../assets/validate/valid/lucy.decimated.ply");
@@ -148,12 +154,12 @@ TEST_CASE("importing conformance tests")
     parse_ply_file("../assets/validate/valid/payload.valid.crlf.ply");
     parse_ply_file("../assets/validate/valid/payload.valid.ply");
 }
-*/
 
 ///////////////////
 //   Unit Tests  //
 ///////////////////
 
+// See https://github.com/ddiakopoulos/tinyply/issues/25
 TEST_CASE("property groups must all share the same type")
 {
     std::ifstream filestream("../assets/validate/invalid/payload.empty.ply", std::ios::binary);
@@ -162,12 +168,28 @@ TEST_CASE("property groups must all share the same type")
     CHECK_THROWS_AS(file.request_properties_from_element("vertex", { "x", "y", "z", "r", "g", "b", "a", "uv1", "uv2" }), std::invalid_argument);
 }
 
+// An earlier (but widespread) version of Assimp had a non-conformant PLY exporter and did not prepend comments with "comment" 
 TEST_CASE("check for invalid strings in the header")
 {
     std::ifstream filestream("../assets/validate/invalid/kcrane.bob.meshconvert.com.ply", std::ios::binary);
     PlyFile file;
     bool header_result = file.parse_header(filestream);
-    REQUIRE_FALSE(header_result); // an earlier version of ASSIMP had a non-conformant exporter and did not prepend comments with "comment" 
+    REQUIRE_FALSE(header_result); 
+}
+
+// Reported via https://github.com/vilya/ply-parsing-perf
+TEST_CASE("check that variable length lists are unsupported (without crashing)")
+{
+    std::ifstream filestream("../assets/validate/valid/tet.ascii.variable-length.ply", std::ios::binary);
+    PlyFile file;
+    bool header_result = file.parse_header(filestream);
+    REQUIRE(header_result); 
+
+    std::shared_ptr<PlyData> faces;
+    try { faces = file.request_properties_from_element("face", { "vertex_indices" }, 0); }
+    catch (const std::exception& e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+
+    CHECK_THROWS_AS(file.read(filestream), std::runtime_error);
 }
 
 //TEST_CASE("check that int128 is an unrecognized, non-conformant datatype")
@@ -204,7 +226,6 @@ TEST_CASE("check for invalid strings in the header")
 //     //for (const auto & e : file.get_elements()) REQUIRE(e.properties.size() > 0);
 // }
 // 
-// 
 // TEST_CASE("check that element count needs to be >= 0")
 // {
 //     std::ifstream filestream("../assets/validate/invalid/header.invalid-element-count.estatica.ply", std::ios::binary);
@@ -212,8 +233,6 @@ TEST_CASE("check for invalid strings in the header")
 //     bool header_result = file.parse_header(filestream);
 //     REQUIRE_FALSE(header_result);
 // }
-//
-
 // 
 // TEST_CASE("header.invalid-face-property.ply")
 // {
