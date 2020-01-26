@@ -28,6 +28,6 @@ install:
   - which cmake
 
 script:
-  - mkdir build
-  - cd build
-  - cmake --build .
+  - mkdir tinyply_build
+  - cd tinyply_build
+  - cmake --tinyply_build .
