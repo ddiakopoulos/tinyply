@@ -1,28 +1,33 @@
-sudo: false
 language: cpp
-compiler: 
-  - gcc
-  - clang
+sudo: true
 
-addons:
-  apt:
-    sources:
-    - ubuntu-toolchain-r-test
-    - llvm-toolchain-precise-3.7
-    packages:
-    - gcc-4.9
-    - g++-4.9
-    - clang-3.7
+matrix:
+  include:
+    - os: linux
+      env: CXXFLAGS="-std=c++11"
+    - os: osx
+      env: CXXFLAGS="-std=c++11"
 
 install:
-  # /usr/bin/gcc is 4.6 always, but gcc-X.Y is available.
-  - if [ "$CXX" = "g++" ]; then export CXX="g++-4.9" CC="gcc-4.9"; fi
-  # /usr/bin/clang is 3.4, lets override with modern one.
-  - if [ "$CXX" = "clang++" ] && [ "$TRAVIS_OS_NAME" = "linux" ]; then export CXX="clang++-3.7" CC="clang-3.7"; fi
-  - echo ${CXX}
-  - ${CXX} --version
-  - ${CXX} -v
+  # install latest cmake
+  - |
+    if [ "$TRAVIS_OS_NAME" == "linux" ]; then
+      CMAKE_URL="https://cmake.org/files/v3.11/cmake-3.11.1-Linux-x86_64.tar.gz";
+      mkdir cmake_latest && travis_retry wget --no-check-certificate --quiet -O - ${CMAKE_URL} | tar --strip-components=1 -xz -C cmake_latest;
+      export PATH=$(pwd)/cmake_latest/bin:${PATH};
+    fi
 
-script: 
-  cd source;
-  make;
+  - |
+    if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
+      brew update;
+      brew uninstall cmake;
+      brew install cmake;
+    fi
+  - which ${CC}
+  - which ${CXX}
+  - which cmake
+
+script:
+  - mkdir build
+  - cd build
+  - cmake --build .
