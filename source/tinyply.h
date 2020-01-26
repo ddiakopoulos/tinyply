@@ -31,6 +31,8 @@
 #include <memory>
 #include <unordered_map>
 #include <map>
+#include <algorithm>
+#include <functional>
 
 namespace tinyply
 {
@@ -663,7 +665,9 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
     // element name and property name), but groups of properties (requested from the
     // public api through this function) all share the same `ParsingHelper`. When it comes 
     // time to .read(), we check the number of unique PlyData shared pointers
-    // and allocate a single buffer that will be used by each individual property. 
+    // and allocate a single buffer that will be used by each property key group. 
+    // That way, properties like, {"x", "y", "z"} will all be put into the same buffer.
+
     ParsingHelper helper;
     helper.data = std::make_shared<PlyData>();
     helper.data->count = 0;
@@ -674,7 +678,7 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
 
     if (elements.empty()) throw std::runtime_error("header had no elements defined. malformed file?");
     if (elementKey.empty()) throw std::invalid_argument("`elementKey` argument is empty");
-    if (!propertyKeys.size()) throw std::invalid_argument("`propertyKeys` argument is empty");
+    if (propertyKeys.empty()) throw std::invalid_argument("`propertyKeys` argument is empty");
 
     const int64_t elementIndex = find_element(elementKey, elements);
 
@@ -686,17 +690,13 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
         // We found the element
         const PlyElement & element = elements[elementIndex];
 
-        helper.data->count = element.size;
+        helper.data->count = element.size; // how many items are in the element? 
 
         // Find each of the keys
-        for (auto key : propertyKeys)
+        for (const auto & key : propertyKeys)
         {
             const int64_t propertyIndex = find_property(key, element.properties);
-            // The key was not found
-            if (propertyIndex < 0)
-            {
-                keys_not_found.push_back(key);
-            }
+            if (propertyIndex < 0) keys_not_found.push_back(key);
         }
 
         if (keys_not_found.size())
@@ -706,7 +706,7 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
             throw std::invalid_argument("the following property keys were not found in the header: " + ss.str());
         }
 
-        for (auto key : propertyKeys)
+        for (const auto & key : propertyKeys)
         {
             const int64_t propertyIndex = find_property(key, element.properties);
             const PlyProperty & property = element.properties[propertyIndex];
@@ -718,15 +718,23 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
                 throw std::invalid_argument("element-property key has already been requested: " + element.name + " " + property.name);
             }
         }
+
+        // Sanity check that all properties share the same type
+        std::vector<Type> propertyTypes;
+        for (const auto & key : propertyKeys)
+        {
+            const int64_t propertyIndex = find_property(key, element.properties);
+            const PlyProperty & property = element.properties[propertyIndex];
+            propertyTypes.push_back(property.propertyType);
+        }
+
+        if (std::adjacent_find(propertyTypes.begin(), propertyTypes.end(), std::not_equal_to<>()) != propertyTypes.end())
+        {
+            throw std::invalid_argument("all requested properties must share the same type.");
+        }
     }
     else throw std::invalid_argument("the element key was not found in the header: " + elementKey);
 
-    if (keys_not_found.size())
-    {
-        std::stringstream ss;
-        for (auto & str : keys_not_found) ss << str << ", ";
-        throw std::invalid_argument("the following property keys were not found in the header: " + ss.str());
-    }
     return helper.data;
 }
 
@@ -738,7 +746,7 @@ void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & element
     helper.data = std::make_shared<PlyData>();
     helper.data->count = count;
     helper.data->t = type;
-    helper.data->buffer = Buffer(data);
+    helper.data->buffer = Buffer(data); // we should also set size for safety reasons
     helper.cursor = std::make_shared<PlyDataCursor>();
 
     auto create_property_on_element = [&](PlyElement & e)
