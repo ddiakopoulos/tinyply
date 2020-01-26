@@ -728,7 +728,7 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
             propertyTypes.push_back(property.propertyType);
         }
 
-        if (std::adjacent_find(propertyTypes.begin(), propertyTypes.end(), std::not_equal_to<>()) != propertyTypes.end())
+        if (std::adjacent_find(propertyTypes.begin(), propertyTypes.end(), std::not_equal_to<Type>()) != propertyTypes.end())
         {
             throw std::invalid_argument("all requested properties must share the same type.");
         }
