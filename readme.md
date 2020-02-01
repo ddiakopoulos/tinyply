@@ -1,6 +1,6 @@
 # tinyply 2.3
 
-[![Release is 2.3](http://img.shields.io/badge/release-2.3-blue.svg?style=flat)](https://raw.githubusercontent.com/ddiakopoulos/tinyply/master/source/tinyply.h)
+[![Release is 2.3.2](http://img.shields.io/badge/release-2.3.2-blue.svg?style=flat)](https://raw.githubusercontent.com/ddiakopoulos/tinyply/master/source/tinyply.h)
 [![License is Unlicense](http://img.shields.io/badge/license-Unlicense-blue.svg?style=flat)](http://unlicense.org/)
 
 Platform | Build Status |
