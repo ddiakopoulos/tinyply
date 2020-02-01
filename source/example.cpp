@@ -182,7 +182,7 @@ void read_ply_file(const std::string & filepath, uint32_t list_hint = 0, bool pr
             if (vertices->t == tinyply::Type::FLOAT64) { /* as doubles ... */ }
         }
 
-        // Example: variable length lists
+        // Example Three: variable length lists
         {
             struct u3 { uint32_t x, y, z; };
             struct u4 { uint32_t x, y, z, w; };

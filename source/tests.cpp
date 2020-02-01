@@ -18,6 +18,29 @@ using namespace tinyply;
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
+#include <filesystem>
+namespace fs = std::experimental::filesystem;
+
+std::vector<std::string> iterate_directory(const fs::path& root, const std::string& extensionIncludingDot)
+{
+    std::vector<std::string> paths;
+
+    for (auto& entry : fs::recursive_directory_iterator(root))
+    {
+        const size_t root_len = root.string().length(), ext_len = entry.path().extension().string().length();
+        auto path = entry.path().string(), name = path.substr(root_len + 1, path.size() - root_len - ext_len - 1);
+
+        for (auto& chr : name) if (chr == '\\') chr = '/';
+
+        if (entry.path().extension() == extensionIncludingDot)
+        {
+            paths.push_back(path);
+        }
+    }
+
+    return paths;
+};
+
 inline std::string get_filename_without_extension(const std::string& path)
 {
     if (path.find_last_of(".") != std::string::npos && path.find_last_of("\\") != std::string::npos)
@@ -52,7 +75,7 @@ void transcode_ply_file(PlyFile & file, const std::string & filepath)
     //file.write(outstream_ascii, false);
 }
 
-bool parse_ply_file(const std::string & filepath, const uint32_t list_hint = 0)
+bool parse_ply_file(const std::string & filepath, bool transcode = false, const uint32_t list_hint = 0, float * out_time_seconds = nullptr)
 {
     manual_timer timer;
     std::ifstream filestream(filepath, std::ios::binary);
@@ -115,6 +138,7 @@ bool parse_ply_file(const std::string & filepath, const uint32_t list_hint = 0)
 
             const float parsing_time = (float) timer.get() / 1000.f;
             std::cout << "\tparsing " << size_mb << "mb in " << parsing_time << " seconds [" << (size_mb / parsing_time) << " MBps]" << std::endl;
+            if (out_time_seconds) *out_time_seconds = parsing_time;
 
             for (auto & p : vertex_element)
             {
@@ -153,12 +177,15 @@ bool parse_ply_file(const std::string & filepath, const uint32_t list_hint = 0)
                 if (num_n_gons)    std::cout << "\tread " << num_n_gons << " total n_gons " << std::endl;
             }
 
-            timer.start();
-            transcode_ply_file(file, filepath);
-            timer.stop();
+            if (transcode)
+            {
+                timer.start();
+                transcode_ply_file(file, filepath);
+                timer.stop();
 
-            const float transcode_time = (float)timer.get() / 1000.f;
-            std::cout << "\ttranscoded in " << transcode_time << " seconds." << std::endl;
+                const float transcode_time = (float)timer.get() / 1000.f;
+                std::cout << "\ttranscoded in " << transcode_time << " seconds." << std::endl;
+            }
 
             return header_result;
         }
@@ -170,6 +197,24 @@ bool parse_ply_file(const std::string & filepath, const uint32_t list_hint = 0)
     }
 
     return false;
+}
+
+//////////////////////////////
+//   PBRT Performance Test  //
+//////////////////////////////
+
+TEST_CASE("load all pbrt files")
+{
+    float sum_timer = 0.f;
+    const auto files = iterate_directory("../assets/pbrt/", ".ply");
+    for (const auto & path : files)
+    {   
+        float time_to_parse = 0.f;
+        parse_ply_file(path, false, 0, &time_to_parse);
+        sum_timer += time_to_parse;
+    }
+
+    std::cout << ">>> test ran in " << sum_timer << " seconds." << std::endl;
 }
 
 ///////////////////////////
@@ -232,7 +277,7 @@ TEST_CASE("importing conformance tests")
     parse_ply_file("../assets/validate/valid/tri_gouraud.ply");
     parse_ply_file("../assets/validate/valid/vtk.blob.ply");
     parse_ply_file("../assets/validate/valid/blade.ply");                      // 82mb
-    parse_ply_file("../assets/validate/valid/lucy.ply", 3);                    // 520mb
+    parse_ply_file("../assets/validate/valid/lucy.ply", true, 3);              // 520mb
     parse_ply_file("../assets/validate/valid/redrocks.dronemapper.ply");       // 268mb
     parse_ply_file("../assets/validate/valid/navvis.HQ3rdFloor.SLAM.5mm.ply"); // 1700mb
     timer.stop();
