@@ -251,6 +251,7 @@ TEST_CASE("requested property groups must all share the same type")
     std::ifstream filestream("../assets/validate/invalid/payload.empty.ply", std::ios::binary);
     PlyFile file;
     bool header_result = file.parse_header(filestream);
+    REQUIRE(header_result);
     CHECK_THROWS_AS(file.request_properties_from_element("vertex", { "x", "y", "z", "r", "g", "b", "a", "uv1", "uv2" }), std::invalid_argument);
 }
 

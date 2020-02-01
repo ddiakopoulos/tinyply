@@ -180,7 +180,7 @@ namespace tinyply
          * Execute a callback with reading progress every `num_bytes`. This is primarily for friendliness in working
          * with large files in gui-oriented applications. 
          */
-        void set_progress_callback(const size_t num_bytes, std::function<void(tinyply::ProgressCallbackInfo & info)> callback);
+        void set_progress_callback(const size_t num_bytes, std::function<void(const tinyply::ProgressCallbackInfo info)> callback);
 
         /* 
          * Parse the payload. Buffers must be requested via `request_properties_from_element(...)` 
@@ -294,7 +294,7 @@ struct PlyFile::PlyFileImpl
     size_t total_bytes_requested {0};
     size_t total_bytes_parsed {0};
     size_t cb_period_bytes {0};
-    std::function<void(tinyply::ProgressCallbackInfo & info)> callback;
+    std::function<void(tinyply::ProgressCallbackInfo info)> callback;
 
     void read(std::istream & is);
     void write(std::ostream & os, bool isBinary);
@@ -527,13 +527,7 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
 
     // Discover if we can allocate up front without parsing the file twice 
     uint32_t list_hints = 0;
-    for (auto & b : buffers) 
-    {
-        for (auto & entry : userData) 
-        {
-            list_hints += entry.second.list_size_hint;
-        }
-    }
+    for (auto & entry : userData) list_hints += entry.second.list_size_hint;
 
     // No list hints? Then we need to calculate how much memory to allocate
     if (list_hints == 0) 
@@ -541,10 +535,7 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
         // Allocate memory for variable length lists
         for (auto & b : buffers)
         {
-            for (auto& entry : userData)
-            {
-                if (b->isList) b->list_indices.resize(b->count);
-            }
+            if (b->isList) b->list_indices.resize(b->count);
         }
 
         parse_data(is, true);
@@ -1030,7 +1021,7 @@ std::vector<PlyElement> PlyFile::get_elements() const { return impl->elements; }
 std::vector<std::string> & PlyFile::get_comments() { return impl->comments; }
 std::vector<std::string> PlyFile::get_info() const { return impl->objInfo; }
 bool PlyFile::is_binary_file() const { return impl->isBinary; }
-void PlyFile::set_progress_callback(const size_t num_bytes, std::function<void(tinyply::ProgressCallbackInfo & info)> callback) 
+void PlyFile::set_progress_callback(const size_t num_bytes, std::function<void(const tinyply::ProgressCallbackInfo info)> callback)
 {
     impl->cb_period_bytes = num_bytes;
     impl->callback = callback; 

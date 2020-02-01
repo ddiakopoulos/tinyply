@@ -145,11 +145,11 @@ void read_ply_file(const std::string & filepath, uint32_t list_hint = 0, bool pr
         // Example of the reading progress callback API
         if (true)
         {
-            auto progress_callback = [](tinyply::ProgressCallbackInfo& info)
+            auto progress_callback = [](const tinyply::ProgressCallbackInfo info)
             {
                 std::cout << "\tcallback %: " << ((float)info.current_bytes / (float)info.total_bytes) * 100.f << "\n";
             };
-            file.set_progress_callback(1e+7, progress_callback); // every 10mb
+            file.set_progress_callback((size_t)1e+7, progress_callback); // every 10mb
         }
 
         read_timer.start();
@@ -234,6 +234,8 @@ void read_ply_file(const std::string & filepath, uint32_t list_hint = 0, bool pr
 
 int main(int argc, char *argv[])
 {
+    (void) argc; (void) argv;
+
     // Circular write-read
     write_ply_example("example_cube");
     read_ply_file("example_cube-ascii.ply", 0);

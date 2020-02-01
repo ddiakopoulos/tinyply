@@ -50,6 +50,7 @@ struct memory_buffer : public std::streambuf
 
     pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) override
     {
+        (void)which;
         if (dir == std::ios_base::cur) gbump(static_cast<int>(off));
         else setg(p_start, (dir == std::ios_base::beg ? p_start : p_end) + off, p_end);
         return gptr() - p_start;
