@@ -52,7 +52,7 @@ void transcode_ply_file(PlyFile & file, const std::string & filepath)
     //file.write(outstream_ascii, false);
 }
 
-bool parse_ply_file(const std::string & filepath)
+bool parse_ply_file(const std::string & filepath, const uint32_t list_hint = 0)
 {
     manual_timer timer;
     std::ifstream filestream(filepath, std::ios::binary);
@@ -68,6 +68,7 @@ bool parse_ply_file(const std::string & filepath)
             filestream.seekg(0, std::ios::beg);
 
             bool header_result = file.parse_header(filestream);
+            if (!header_result) return header_result;
 
             // All ply files are required to have a vertex element
             std::unordered_map<std::string, std::shared_ptr<PlyData>> vertex_element;
@@ -86,7 +87,7 @@ bool parse_ply_file(const std::string & filepath)
                     for (const auto & p : e.properties)
                     {
                         try { vertex_element[p.name] = file.request_properties_from_element(e.name, { p.name }); }
-                        catch (const std::exception & e) { /**/ }
+                        catch (...) { /**/ }
                     }
                 }
 
@@ -101,11 +102,11 @@ bool parse_ply_file(const std::string & filepath)
 
             if (!likely_face_property_name.empty())
             {
-                try { faces = file.request_properties_from_element("face", { likely_face_property_name }, 0); }
-                catch (const std::exception& e) { /**/  }
+                try { faces = file.request_properties_from_element("face", { likely_face_property_name }, list_hint); }
+                catch (...) { /**/  }
 
                 try { tripstrip = file.request_properties_from_element("tristrips", { likely_face_property_name }, 0); }
-                catch (const std::exception& e) { /**/  }
+                catch (...) { /**/  }
             }
 
             timer.start();
@@ -129,6 +130,27 @@ bool parse_ply_file(const std::string & filepath)
                         }
                     }
                 }
+            }
+
+            if (faces)
+            {
+                size_t num_triangles{ 0 };
+                size_t num_quads{ 0 };
+                size_t num_n_gons{ 0 };
+
+                if (faces->list_indices.size() > 0)
+                {
+                    for (const auto& index_length : faces->list_indices)
+                    {
+                        if (index_length == 3) num_triangles++;
+                        else if (index_length == 4) num_quads++;
+                        else num_n_gons++;
+                    }
+                }
+
+                if (num_triangles) std::cout << "\tread " << num_triangles << " total triangles " << std::endl;
+                if (num_quads)     std::cout << "\tread " << num_quads << " total quads " << std::endl;
+                if (num_n_gons)    std::cout << "\tread " << num_n_gons << " total n_gons " << std::endl;
             }
 
             timer.start();
@@ -190,6 +212,7 @@ TEST_CASE("importing conformance tests")
     parse_ply_file("../assets/validate/valid/heptoroid.ply");
     parse_ply_file("../assets/validate/valid/kcrane.csaszar.ply");
     parse_ply_file("../assets/validate/valid/kcrane.spot.ply");
+    parse_ply_file("../assets/validate/valid/kcrane.city.ply");
     parse_ply_file("../assets/validate/valid/laserdesign.dragon.ply");
     parse_ply_file("../assets/validate/valid/lion.ply");
     parse_ply_file("../assets/validate/valid/lucy.decimated.ply");
@@ -209,7 +232,7 @@ TEST_CASE("importing conformance tests")
     parse_ply_file("../assets/validate/valid/tri_gouraud.ply");
     parse_ply_file("../assets/validate/valid/vtk.blob.ply");
     parse_ply_file("../assets/validate/valid/blade.ply");                      // 82mb
-    parse_ply_file("../assets/validate/valid/lucy.ply");                       // 520mb
+    parse_ply_file("../assets/validate/valid/lucy.ply", 3);                    // 520mb
     parse_ply_file("../assets/validate/valid/redrocks.dronemapper.ply");       // 268mb
     parse_ply_file("../assets/validate/valid/navvis.HQ3rdFloor.SLAM.5mm.ply"); // 1700mb
     timer.stop();
@@ -218,9 +241,9 @@ TEST_CASE("importing conformance tests")
     std::cout << ">>> test ran in " << conformance_time << " seconds." << std::endl;
 }
 
-///////////////////
-//   Unit Tests  //
-///////////////////
+////////////////////////////////
+//   Unit & Regression Tests  //
+////////////////////////////////
 
 // See https://github.com/ddiakopoulos/tinyply/issues/25
 TEST_CASE("requested property groups must all share the same type")
@@ -240,8 +263,7 @@ TEST_CASE("check for invalid strings in the header")
     REQUIRE_FALSE(header_result); 
 }
 
-// Reported via https://github.com/vilya/ply-parsing-perf
-TEST_CASE("check that variable length lists are unsupported (without crashing)")
+TEST_CASE("check that variable length lists are supported (without crashing)")
 {
     auto variable_length_test = [](const std::string & filepath)
     {
@@ -254,53 +276,43 @@ TEST_CASE("check that variable length lists are unsupported (without crashing)")
         try { faces = file.request_properties_from_element("face", { "vertex_indices" }, 0); }
         catch (const std::exception& e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
-        CHECK_THROWS_AS(file.read(filestream), std::runtime_error);
+        CHECK_NOTHROW(file.read(filestream));
     };
 
     variable_length_test("../assets/validate/valid/tet.ascii.variable-length.ply");
     variable_length_test("../assets/validate/valid/kcrane.city.ply");
 }
 
-//TEST_CASE("check that int128 is an unrecognized, non-conformant datatype")
-//{
-//    std::ifstream filestream("../assets/validate/invalid/header.invalid-face-data-type-int128.ply", std::ios::binary);
-//    PlyFile file;
-//    bool header_result = file.parse_header(filestream);
-//    REQUIRE_FALSE(header_result); 
-//}
-//
-//TEST_CASE("check that float16 is an unrecognized, non-conformant datatype")
-//{
-//    std::ifstream filestream("../assets/validate/invalid/header.invalid-face-property-type-float16.ply", std::ios::binary);
-//    PlyFile file;
-//    bool header_result = file.parse_header(filestream);
-//    REQUIRE_FALSE(header_result); 
-//}
-//
-//TEST_CASE("check that elements must have at least one property")
-//{
-//    std::ifstream filestream("../assets/validate/invalid/header.incomplete-face-def.ply", std::ios::binary);
-//    PlyFile file;
-//    bool header_result = file.parse_header(filestream);
-//    REQUIRE(header_result);
-//    for (const auto & e : file.get_elements()) REQUIRE(e.properties.size() > 0);
-//}
-//
-// TEST_CASE("check that elements must have at least one property")
+TEST_CASE("check that int128 is an unrecognized, non-conformant datatype")
+{
+    std::ifstream filestream("../assets/validate/invalid/header.invalid-face-data-type-int128.ply", std::ios::binary);
+    PlyFile file;
+    bool header_result = file.parse_header(filestream);
+    REQUIRE_FALSE(header_result); 
+}
+
+TEST_CASE("check that float16 is an unrecognized, non-conformant datatype")
+{
+    std::ifstream filestream("../assets/validate/invalid/header.invalid-face-property-type-float16.ply", std::ios::binary);
+    PlyFile file;
+    bool header_result = file.parse_header(filestream);
+    REQUIRE_FALSE(header_result); 
+}
+
+// TEST_CASE("payload.unexpected-eof.ply")
 // {
-//     std::ifstream filestream("../assets/validate/invalid/header.incomplete-face-def.ply", std::ios::binary);
+//     std::ifstream filestream("../assets/validate/invalid/payload.unexpected-eof.ply", std::ios::binary);
 //     PlyFile file;
 //     bool header_result = file.parse_header(filestream);
 //     REQUIRE(header_result);
-//     //for (const auto & e : file.get_elements()) REQUIRE(e.properties.size() > 0);
-// }
 // 
-// TEST_CASE("check that element count needs to be >= 0")
-// {
-//     std::ifstream filestream("../assets/validate/invalid/header.invalid-element-count.estatica.ply", std::ios::binary);
-//     PlyFile file;
-//     bool header_result = file.parse_header(filestream);
-//     REQUIRE_FALSE(header_result);
+//     try { auto x = file.request_properties_from_element("vertex", { "x" }); }
+//     catch (const std::exception& e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+// 
+//     try { auto faces = file.request_properties_from_element("face", { "vertex_indices" }, 0); }
+//     catch (const std::exception& e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
+// 
+//     CHECK_THROWS_AS(file.read(filestream), std::exception);
 // }
 // 
 // TEST_CASE("header.invalid-face-property.ply")
@@ -393,12 +405,3 @@ TEST_CASE("check that variable length lists are unsupported (without crashing)")
 //     parse_ply_file("../assets/validate/invalid/payload.ignored-vertex-components.ply");
 // }
 // 
-// TEST_CASE("payload.unaligned-memory.ply")
-// {
-//     parse_ply_file("../assets/validate/invalid/payload.unaligned-memory.ply");
-// }
-// 
-// TEST_CASE("payload.unexpected-eof.ply")
-// {
-//     parse_ply_file("../assets/validate/invalid/payload.unexpected-eof.ply");
-// }
