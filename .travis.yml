@@ -4,9 +4,9 @@ sudo: true
 matrix:
   include:
     - os: linux
-      env: CXXFLAGS="-std=c++11"
+      env: CXXFLAGS="-std=c++11 -Wall -Wextra -Wpedantic -Wshadow"
     - os: osx
-      env: CXXFLAGS="-std=c++11"
+      env: CXXFLAGS="-std=c++11 -Wall -Wextra -Wpedantic -Wshadow"
 
 install:
   # install latest cmake
