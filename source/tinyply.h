@@ -83,7 +83,7 @@ namespace tinyply
         Buffer(const size_t size) : data(new uint8_t[size], delete_array()), size(size) { alias = data.get(); } // allocating
         Buffer(const uint8_t * ptr): alias(const_cast<uint8_t*>(ptr)) { } // non-allocating, todo: set size?
         uint8_t * get() { return alias; }
-        const uint8_t * get_const() {return const_cast<const uint8_t*>(alias); }
+        const uint8_t * get() const { return alias; }
         size_t size_bytes() const { return size; }
     };
 
@@ -598,11 +598,11 @@ void PlyFile::PlyFileImpl::write_binary_internal(std::ostream & os) noexcept
                 {
                     std::memcpy(listSize, &p.listCount, sizeof(uint32_t));
                     write_property_binary(os, listSize, dummyCount, f.list_stride);
-                    write_property_binary(os, (helper->data->buffer.get_const() + helper->cursor->byteOffset), helper->cursor->byteOffset, f.prop_stride * p.listCount);
+                    write_property_binary(os, (helper->data->buffer.get() + helper->cursor->byteOffset), helper->cursor->byteOffset, f.prop_stride * p.listCount);
                 }
                 else
                 {
-                    write_property_binary(os, (helper->data->buffer.get_const() + helper->cursor->byteOffset), helper->cursor->byteOffset, f.prop_stride);
+                    write_property_binary(os, (helper->data->buffer.get() + helper->cursor->byteOffset), helper->cursor->byteOffset, f.prop_stride);
                 }
                 property_index++;
             }
