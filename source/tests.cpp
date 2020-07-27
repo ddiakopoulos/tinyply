@@ -144,7 +144,7 @@ bool parse_ply_file(const std::string & filepath)
     catch (const std::exception & e)
     {
         std::cout << "Caught Exception: " << e.what() << std::endl;
-        REQUIRE(FALSE);
+        REQUIRE(false);
     }
 
     return false;
