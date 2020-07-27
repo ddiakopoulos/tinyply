@@ -135,7 +135,7 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
         file.read(*file_stream);
         read_timer.stop();
 
-        const float parsing_time = read_timer.get() / 1000.f;
+        const float parsing_time = static_cast<float>(read_timer.get()) / 1000.f;
         std::cout << "\tparsing " << size_mb << "mb in " << parsing_time << " seconds [" << (size_mb / parsing_time) << " MBps]" << std::endl;
 
         if (vertices)   std::cout << "\tRead " << vertices->count  << " total vertices "<< std::endl;

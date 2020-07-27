@@ -189,7 +189,9 @@ namespace tinyply
 #include <iostream>
 #include <cstring>
 
-using namespace tinyply;
+namespace tinyply
+{
+
 using namespace std;
 
 template<typename T, typename T2> inline T2 endian_swap(const T & v) noexcept { return v; }
@@ -967,5 +969,7 @@ void PlyFile::add_properties_to_element(const std::string & elementKey,
 {
     return impl->add_properties_to_element(elementKey, propertyKeys, type, count, data, listType, listCount);
 }
+
+} // end namespace tinyply
 
 #endif // end TINYPLY_IMPLEMENTATION
