@@ -8,8 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 project(tinyply LANGUAGES CXX)
 set(PROJECT_VERSION 2.3)
 
-include_directories("${CMAKE_SOURCE_DIR}/source")
-include_directories("${CMAKE_SOURCE_DIR}/third-party")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/source")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/third-party")
 
 set(CMAKE_DEBUG_POSTFIX "d")
 
