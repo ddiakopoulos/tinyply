@@ -1,5 +1,5 @@
 /*
- * tinyply 2.3.3 (https://github.com/ddiakopoulos/tinyply)
+ * tinyply 2.3.4 (https://github.com/ddiakopoulos/tinyply)
  *
  * A single-header, zero-dependency (except the C++ STL) public domain implementation
  * of the PLY mesh file format. Requires C++11; errors are handled through exceptions.
