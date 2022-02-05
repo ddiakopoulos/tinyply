@@ -279,8 +279,8 @@ struct PlyFile::PlyFileImpl
         const std::vector<std::string> propertyKeys,
         const Type type, const size_t count, const uint8_t * data, const Type listType, const size_t listCount);
 
-    size_t read_property_binary(const size_t & stride, void * dest, size_t & destOffset, std::istream & is) noexcept;
-    size_t read_property_ascii(const Type & t, const size_t & stride, void * dest, size_t & destOffset, std::istream & is);
+    size_t read_property_binary(const size_t & stride, void * dest, size_t & destOffset, size_t destSize, std::istream & is);
+    size_t read_property_ascii(const Type & t, const size_t & stride, void * dest, size_t & destOffset, size_t destSize, std::istream & is);
 
     std::vector<std::vector<PropertyLookup>> make_property_lookup_table();
 
@@ -429,15 +429,25 @@ void PlyFile::PlyFileImpl::read_header_property(std::istream & is)
     elements.back().properties.emplace_back(is);
 }
 
-size_t PlyFile::PlyFileImpl::read_property_binary(const size_t & stride, void * dest, size_t & destOffset, std::istream & is) noexcept
+size_t PlyFile::PlyFileImpl::read_property_binary(const size_t & stride, void * dest, size_t & destOffset, size_t destSize, std::istream & is)
 {
+    if (destOffset + stride > destSize)
+    {
+        throw std::runtime_error("unexpected EOF. malformed file?");
+    }
+
     destOffset += stride;
     is.read((char*)dest, stride);
     return stride;
 }
 
-size_t PlyFile::PlyFileImpl::read_property_ascii(const Type & t, const size_t & stride, void * dest, size_t & destOffset, std::istream & is)
+size_t PlyFile::PlyFileImpl::read_property_ascii(const Type & t, const size_t & stride, void * dest, size_t & destOffset, size_t destSize, std::istream & is)
 {
+    if (destOffset + stride > destSize)
+    {
+        throw std::runtime_error("unexpected EOF. malformed file?");
+    }
+
     destOffset += stride;
     switch (t)
     {
@@ -810,7 +820,7 @@ void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & element
 
 void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
 {
-    std::function<void(PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & destOffset, std::istream & is)> read;
+    std::function<void(PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & destOffset, size_t destSize, std::istream & is)> read;
     std::function<size_t(PropertyLookup & f, const PlyProperty & p, std::istream & is)> skip;
 
     const auto start = is.tellg();
@@ -846,14 +856,14 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
 
     if (isBinary)
     {
-        read = [this, &listSize, &dummyCount, &read_list_binary](PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & destOffset, std::istream & _is) noexcept
+        read = [this, &listSize, &dummyCount, &read_list_binary](PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & destOffset, size_t destSize, std::istream & _is)
         {
             if (!p.isList)
             {
-                return read_property_binary(f.prop_stride, dest + destOffset, destOffset, _is);
+                return read_property_binary(f.prop_stride, dest + destOffset, destOffset, destSize, _is);
             }
             read_list_binary(p.listType, &listSize, dummyCount, f.list_stride, _is); // the list size
-            return read_property_binary(f.prop_stride * listSize, dest + destOffset, destOffset, _is); // properties in list
+            return read_property_binary(f.prop_stride * listSize, dest + destOffset, destOffset, destSize, _is); // properties in list
         };
         skip = [this, &listSize, &dummyCount, &read_list_binary](PropertyLookup & f, const PlyProperty & p, std::istream & _is) noexcept
         {
@@ -870,18 +880,18 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
     }
     else
     {
-        read = [this, &listSize, &dummyCount](PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & destOffset, std::istream & _is) noexcept
+        read = [this, &listSize, &dummyCount](PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & destOffset, size_t destSize, std::istream & _is)
         {
             if (!p.isList)
             {
-                read_property_ascii(p.propertyType, f.prop_stride, dest + destOffset, destOffset, _is);
+                read_property_ascii(p.propertyType, f.prop_stride, dest + destOffset, destOffset, destSize, _is);
             }
             else
             {
-                read_property_ascii(p.listType, f.list_stride, &listSize, dummyCount, _is); // the list size
+                read_property_ascii(p.listType, f.list_stride, &listSize, dummyCount, sizeof(listSize), _is); // the list size
                 for (size_t i = 0; i < listSize; ++i)
                 {
-                    read_property_ascii(p.propertyType, f.prop_stride, dest + destOffset, destOffset, _is);
+                    read_property_ascii(p.propertyType, f.prop_stride, dest + destOffset, destOffset, destOffset, _is);
                 }
             }
         };
@@ -890,7 +900,8 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
             skip_ascii_buffer.clear();
             if (p.isList)
             {
-                read_property_ascii(p.listType, f.list_stride, &listSize, dummyCount, _is); // the list size (does not count for memory alloc)
+                dummyCount = 0;
+                read_property_ascii(p.listType, f.list_stride, &listSize, dummyCount, sizeof(listSize), _is); // the list size (does not count for memory alloc)
                 for (size_t i = 0; i < listSize; ++i) _is >> skip_ascii_buffer; // properties in list
                 return listSize * f.prop_stride;
             }
@@ -929,7 +940,8 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
                     }
                     else
                     {
-                        read(lookup, property, helper->data->buffer.get(), helper->cursor->byteOffset, is);
+                        const size_t destSize = helper->data->buffer.size_bytes();
+                        read(lookup, property, helper->data->buffer.get(), helper->cursor->byteOffset, destSize, is);
                     }
                 }
                 else
