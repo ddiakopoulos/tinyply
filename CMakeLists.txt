@@ -8,8 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 project(tinyply LANGUAGES CXX)
 set(PROJECT_VERSION 2.3)
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/source")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/third-party")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 set(CMAKE_DEBUG_POSTFIX "d")
 
@@ -17,9 +16,9 @@ set(CMAKE_DEBUG_POSTFIX "d")
 set(SHARED_LIB false CACHE BOOL "Build as shared library")
 if(${SHARED_LIB})
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
-    add_library(tinyply SHARED source/tinyply.cpp source/tinyply.h)
+    add_library(tinyply SHARED source/tinyply.cpp include/tinyply.h)
 else()
-    add_library(tinyply STATIC source/tinyply.cpp source/tinyply.h)
+    add_library(tinyply STATIC source/tinyply.cpp include/tinyply.h)
 endif()
 
 set(BUILD_TESTS false CACHE BOOL "Build tests")
@@ -32,6 +31,7 @@ target_link_libraries(example PRIVATE tinyply)
 if(${BUILD_TESTS})
   add_executable(tests source/tests.cpp)
   target_link_libraries(tests PRIVATE tinyply)
+  target_include_directories(tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third-party")
 endif()
 
 # pkg-config support
@@ -69,7 +69,7 @@ install(TARGETS tinyply EXPORT ${targets_export_name}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(FILES source/tinyply.h
+install(FILES include/tinyply.h
         DESTINATION include)
 
 install(FILES "${project_config}" "${version_config}"
