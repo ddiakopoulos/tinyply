@@ -888,10 +888,10 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
             }
             else
             {
-                read_property_ascii(p.listType, f.list_stride, &listSize, dummyCount, sizeof(listSize), _is); // the list size
+                read_property_ascii(p.listType, f.list_stride, &listSize, dummyCount, destSize, _is); // the list size
                 for (size_t i = 0; i < listSize; ++i)
                 {
-                    read_property_ascii(p.propertyType, f.prop_stride, dest + destOffset, destOffset, destOffset, _is);
+                    read_property_ascii(p.propertyType, f.prop_stride, dest + destOffset, destOffset, destSize, _is);
                 }
             }
         };
