@@ -83,7 +83,7 @@ namespace tinyply
         Buffer(const size_t size) : data(new uint8_t[size], delete_array()), size(size) { alias = data.get(); } // allocating
         Buffer(const uint8_t * ptr): alias(const_cast<uint8_t*>(ptr)) { } // non-allocating, todo: set size?
         uint8_t * get() { return alias; }
-        const uint8_t * get_const() {return const_cast<const uint8_t*>(alias); }
+        const uint8_t * get_const() const {return alias; }
         size_t size_bytes() const { return size; }
     };
 
