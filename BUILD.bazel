@@ -2,7 +2,6 @@ cc_library(
     name = "tinyply",
     srcs = ["source/tinyply.cpp"],
     hdrs = ["source/tinyply.h"],
+    includes = ["source"],
     visibility = ["//visibility:public"],
-    includes = ["source"]
-    
 )
