@@ -143,7 +143,7 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
         if (colors)     std::cout << "\tRead " << colors->count << " total vertex colors " << std::endl;
         if (texcoords)  std::cout << "\tRead " << texcoords->count << " total vertex texcoords " << std::endl;
         if (faces)      std::cout << "\tRead " << faces->count     << " total faces (triangles) " << std::endl;
-        if (tripstrip)  std::cout << "\tRead " << (tripstrip->buffer.size_bytes() / tinyply::PropertyTable[tripstrip->t].stride) << " total indicies (tristrip) " << std::endl;
+        if (tripstrip)  std::cout << "\tRead " << (tripstrip->buffer.size_bytes() / tinyply::PropertyTable[tripstrip->t].stride) << " total indices (tristrip) " << std::endl;
 
         // Example One: converting to your own application types
         {
