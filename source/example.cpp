@@ -63,7 +63,11 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
     {
         // For most files < 1gb, pre-loading the entire file upfront and wrapping it into a 
         // stream is a net win for parsing speed, about 40% faster. 
-        if (preload_into_memory)
+        std::ifstream file_helper(filepath, std::ios::binary);
+        file_helper.seekg(0, std::ios::end);
+        std::streamsize size_bytes = file_helper.tellg();
+        file_helper.close();
+        if (preload_into_memory && size_bytes <= 1.9e9)
         {
             byte_buffer = read_file_binary(filepath);
             file_stream.reset(new memory_stream((char*)byte_buffer.data(), byte_buffer.size()));
