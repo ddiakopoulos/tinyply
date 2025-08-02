@@ -1,5 +1,5 @@
 /*
- * tinyply 2.3.4 (https://github.com/ddiakopoulos/tinyply)
+ * tinyply 3.0 (https://github.com/ddiakopoulos/tinyply)
  *
  * A single-header, zero-dependency (except the C++ STL) public domain implementation
  * of the PLY mesh file format. Requires C++11; errors are handled through exceptions.
@@ -33,6 +33,7 @@
 #include <map>
 #include <algorithm>
 #include <functional>
+#include <type_traits>
 
 namespace tinyply
 {
@@ -236,6 +237,72 @@ inline Type property_type_from_string(const std::string & t) noexcept
     return Type::INVALID;
 }
 
+template<typename T, typename T2> inline void endian_swap_buffer(uint8_t * data_ptr, const size_t num_bytes, const size_t stride)
+{
+    for (size_t count = 0; count < num_bytes; count += stride)
+    {
+        *(reinterpret_cast<T2*>(data_ptr)) = endian_swap<T, T2>(*(reinterpret_cast<const T*>(data_ptr)));
+        data_ptr += stride;
+    }
+}
+template<typename T> inline T ply_read_ascii(std::istream & is)
+{
+    T data;
+    is >> data;
+    return data;
+}
+
+template<typename T> inline void ply_cast_ascii(void* dest, std::istream & is)
+{
+    *(static_cast<T*>(dest)) = ply_read_ascii<T>(is);
+}
+
+// Special case mirroring read_property_binary but for list types; this
+// has an additional big endian check to flip the data in place immediately
+// after reading. We do this as a performance optimization; endian flipping is
+// done on regular properties as a post-process after reading (also for optimization)
+// but we need the correct little-endian list count as we read the file.
+inline size_t read_list_binary_be(const Type & t, const size_t& stride, void * dest, size_t & destOffset,  std::istream & is)
+{
+    destOffset += stride;
+    is.read((char*)dest, stride);
+
+    switch (t)
+    {
+    case Type::INT16:  *(int16_t*)dest = endian_swap<int16_t, int16_t>(*(int16_t*)dest);     break;
+    case Type::UINT16: *(uint16_t*)dest = endian_swap<uint16_t, uint16_t>(*(uint16_t*)dest); break;
+    case Type::INT32:  *(int32_t*)dest = endian_swap<int32_t, int32_t>(*(int32_t*)dest);     break;
+    case Type::UINT32: *(uint32_t*)dest = endian_swap<uint32_t, uint32_t>(*(uint32_t*)dest); break;
+    default: break;
+    }
+    return stride;
+}
+
+inline size_t read_property_binary(const size_t & stride, void * dest, size_t & destOffset, std::istream & is)
+{
+    destOffset += stride;
+    is.read((char*)dest, stride);
+    return stride;
+}
+
+inline size_t read_property_ascii(const Type & t, const size_t & stride, void * dest, size_t & destOffset, std::istream & is)
+{
+    destOffset += stride;
+    switch (t)
+    {
+    case Type::INT8:       *((int8_t*)dest) = static_cast<int8_t>(ply_read_ascii<int32_t>(is));    break;
+    case Type::UINT8:      *((uint8_t*)dest) = static_cast<uint8_t>(ply_read_ascii<uint32_t>(is)); break;
+    case Type::INT16:      ply_cast_ascii<int16_t>(dest, is);                 break;
+    case Type::UINT16:     ply_cast_ascii<uint16_t>(dest, is);                break;
+    case Type::INT32:      ply_cast_ascii<int32_t>(dest, is);                 break;
+    case Type::UINT32:     ply_cast_ascii<uint32_t>(dest, is);                break;
+    case Type::FLOAT32:    ply_cast_ascii<float>(dest, is);                   break;
+    case Type::FLOAT64:    ply_cast_ascii<double>(dest, is);                  break;
+    case Type::INVALID:    throw std::invalid_argument("invalid ply property");
+    }
+    return stride;
+}
+
 struct PlyFile::PlyFileImpl
 {
     struct PlyDataCursor
@@ -279,13 +346,15 @@ struct PlyFile::PlyFileImpl
         const std::vector<std::string> propertyKeys,
         const Type type, const size_t count, const uint8_t * data, const Type listType, const size_t listCount);
 
-    size_t read_property_binary(const size_t & stride, void * dest, size_t & destOffset, size_t destSize, std::istream & is);
-    size_t read_property_ascii(const Type & t, const size_t & stride, void * dest, size_t & destOffset, size_t destSize, std::istream & is);
-
     std::vector<std::vector<PropertyLookup>> make_property_lookup_table();
 
     bool parse_header(std::istream & is);
+
     void parse_data(std::istream & is, bool firstPass);
+
+    template <bool is_binary, bool first_pass, bool is_big_endian>
+    void parse_data_impl(std::istream & is);
+
     void read_header_format(std::istream & is);
     void read_header_element(std::istream & is);
     void read_header_property(std::istream & is);
@@ -297,6 +366,109 @@ struct PlyFile::PlyFileImpl
     void write_property_ascii(Type t, std::ostream & os, const uint8_t * src, size_t & srcOffset);
     void write_property_binary(std::ostream & os, const uint8_t * src, size_t & srcOffset, const size_t & stride) noexcept;
 };
+
+namespace io
+{
+    template <bool IsBinary, bool isBigEndian>
+    struct property_io;
+
+    // binary little-endian specialization
+    template <>
+    struct property_io<true, false>
+    {
+        static inline size_t read(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & dest_off, std::istream & is, uint32_t & list_size, size_t & dummy_count) noexcept
+        {
+            if (p.isList)
+            {
+                read_property_binary(f.list_stride, &list_size, dummy_count, is);
+                return read_property_binary(f.prop_stride * list_size, dest + dest_off, dest_off, is);
+            }
+            return read_property_binary(f.prop_stride, dest + dest_off, dest_off, is);
+        }
+
+        static inline size_t skip(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, std::istream & is, uint32_t & list_size, size_t & dummy_count) noexcept
+        {
+            if (p.isList)
+            {
+                // read the list
+                read_property_binary(f.list_stride, &list_size, dummy_count, is);
+                const size_t bytes = f.prop_stride * list_size;
+                is.ignore(bytes);
+                return bytes;
+            }
+
+            is.ignore(f.prop_stride);
+            return f.prop_stride;
+        }
+    };
+
+    // binary big-endian specialization
+    template <>
+    struct property_io<true, true>
+    {
+        static inline size_t read(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & dest_off, std::istream & is, uint32_t & list_size, size_t & dummy_count) noexcept
+        {
+            if (p.isList)
+            {
+                read_list_binary_be(p.listType, f.list_stride, &list_size, dummy_count, is);
+                return read_property_binary(f.prop_stride * list_size, dest + dest_off, dest_off, is);
+            }
+            return read_property_binary(f.prop_stride, dest + dest_off, dest_off, is);
+        }
+
+        static inline size_t skip(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, std::istream & is, uint32_t & list_size, size_t & dummy_count) noexcept
+        {
+            if (p.isList)
+            {
+                // read the list
+                read_list_binary_be(p.listType, f.list_stride, &list_size, dummy_count, is);
+                const size_t bytes = f.prop_stride * list_size;
+                is.ignore(bytes);
+                return bytes;
+            }
+
+            is.ignore(f.prop_stride);
+            return f.prop_stride;
+        }
+    };
+
+    // ascii specialization
+    template <>
+    struct property_io<false, false>
+    {
+        static inline size_t read(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & dest_off, std::istream & is, uint32_t & list_size, size_t & dummy_count)
+        {
+            if (p.isList)
+            {
+                // list header (count)
+                read_property_ascii(p.listType, f.list_stride, &list_size, dummy_count, is);
+
+                for (size_t i = 0; i < list_size; ++i)
+                    read_property_ascii(p.propertyType, f.prop_stride, dest + dest_off, dest_off, is);
+
+                return f.prop_stride * list_size;
+            }
+            return static_cast<size_t>(read_property_ascii(p.propertyType, f.prop_stride, dest + dest_off, dest_off, is));
+        }
+
+        static inline size_t skip(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, std::istream & is, uint32_t & list_size, size_t & dummy_count)
+        {
+            std::string junk;
+            if (p.isList) 
+            { 
+                read_property_ascii(p.listType, f.list_stride, &list_size, dummy_count, is);
+                for (size_t i = 0; i < list_size; ++i) is >> junk;
+
+                return f.prop_stride * list_size;
+            }
+
+            is >> junk; 
+            return f.prop_stride;
+
+        }
+    };
+
+} // end namespace io
 
 PlyProperty::PlyProperty(std::istream & is) : isList(false)
 {
@@ -316,28 +488,6 @@ PlyProperty::PlyProperty(std::istream & is) : isList(false)
 PlyElement::PlyElement(std::istream & is)
 {
     is >> name >> size;
-}
-
-template<typename T> inline T ply_read_ascii(std::istream & is)
-{
-    T data;
-    is >> data;
-    return data;
-}
-
-template<typename T, typename T2>
-inline void endian_swap_buffer(uint8_t * data_ptr, const size_t num_bytes, const size_t stride)
-{
-    for (size_t count = 0; count < num_bytes; count += stride)
-    {
-        *(reinterpret_cast<T2 *>(data_ptr)) = endian_swap<T, T2>(*(reinterpret_cast<const T *>(data_ptr)));
-        data_ptr += stride;
-    }
-}
-
-template<typename T> void ply_cast_ascii(void * dest, std::istream & is)
-{
-    *(static_cast<T *>(dest)) = ply_read_ascii<T>(is);
 }
 
 int64_t find_element(const std::string & key, const std::vector<PlyElement> & list)
@@ -427,41 +577,6 @@ void PlyFile::PlyFileImpl::read_header_property(std::istream & is)
 {
     if (!elements.size()) throw std::runtime_error("no elements defined; file is malformed");
     elements.back().properties.emplace_back(is);
-}
-
-size_t PlyFile::PlyFileImpl::read_property_binary(const size_t & stride, void * dest, size_t & destOffset, size_t destSize, std::istream & is)
-{
-    if (destOffset + stride > destSize)
-    {
-        throw std::runtime_error("unexpected EOF. malformed file?");
-    }
-
-    destOffset += stride;
-    is.read((char*)dest, stride);
-    return stride;
-}
-
-size_t PlyFile::PlyFileImpl::read_property_ascii(const Type & t, const size_t & stride, void * dest, size_t & destOffset, size_t destSize, std::istream & is)
-{
-    if (destOffset + stride > destSize)
-    {
-        throw std::runtime_error("unexpected EOF. malformed file?");
-    }
-
-    destOffset += stride;
-    switch (t)
-    {
-    case Type::INT8:       *((int8_t *)dest)  = static_cast<int8_t>(ply_read_ascii<int32_t>(is));   break;
-    case Type::UINT8:      *((uint8_t *)dest) = static_cast<uint8_t>(ply_read_ascii<uint32_t>(is)); break;
-    case Type::INT16:      ply_cast_ascii<int16_t>(dest, is);                 break;
-    case Type::UINT16:     ply_cast_ascii<uint16_t>(dest, is);                break;
-    case Type::INT32:      ply_cast_ascii<int32_t>(dest, is);                 break;
-    case Type::UINT32:     ply_cast_ascii<uint32_t>(dest, is);                break;
-    case Type::FLOAT32:    ply_cast_ascii<float>(dest, is);                   break;
-    case Type::FLOAT64:    ply_cast_ascii<double>(dest, is);                  break;
-    case Type::INVALID:    throw std::invalid_argument("invalid ply property");
-    }
-    return stride;
 }
 
 void PlyFile::PlyFileImpl::write_property_ascii(Type t, std::ostream & os, const uint8_t * src, size_t & srcOffset)
@@ -687,8 +802,7 @@ void PlyFile::PlyFileImpl::write_header(std::ostream & os) noexcept
             {
                 if (p.isList)
                 {
-                    os << "property list " << PropertyTable[p.listType].str << " "
-                       << PropertyTable[p.propertyType].str << " " << p.name << "\n";
+                    os << "property list " << PropertyTable[p.listType].str << " " << PropertyTable[p.propertyType].str << " " << p.name << "\n";
                 }
                 else
                 {
@@ -818,145 +932,79 @@ void PlyFile::PlyFileImpl::add_properties_to_element(const std::string & element
     }
 }
 
-void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool firstPass)
+template <bool IsBinary, bool FirstPass, bool IsBigEndian>
+void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
 {
-    std::function<void(PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & destOffset, size_t destSize, std::istream & is)> read;
-    std::function<size_t(PropertyLookup & f, const PlyProperty & p, std::istream & is)> skip;
+    using io = io::property_io<IsBinary, IsBigEndian>;
 
-    const auto start = is.tellg();
+    const auto file_start = is.tellg();
+    uint32_t   list_size = 0;
+    size_t     dummy_count = 0;
 
-    uint32_t listSize = 0;
-    size_t dummyCount = 0;
-    std::string skip_ascii_buffer;
+    auto element_prop_lut = make_property_lookup_table();
 
-    // Special case mirroring read_property_binary but for list types; this
-    // has an additional big endian check to flip the data in place immediately
-    // after reading. We do this as a performance optimization; endian flipping is
-    // done on regular properties as a post-process after reading (also for optimization)
-    // but we need the correct little-endian list count as we read the file.
-    auto read_list_binary = [this](const Type & t, void * dst, size_t & destOffset, const size_t & stride, std::istream & _is) noexcept
-    {
-        destOffset += stride;
-        _is.read((char*)dst, stride);
-
-        if (isBigEndian)
-        {
-            switch (t)
-            {
-            case Type::INT16:  *(int16_t*)dst  = endian_swap<int16_t, int16_t>(*(int16_t*)dst);    break;
-            case Type::UINT16: *(uint16_t*)dst = endian_swap<uint16_t, uint16_t>(*(uint16_t*)dst); break;
-            case Type::INT32:  *(int32_t*)dst  = endian_swap<int32_t, int32_t>(*(int32_t*)dst);    break;
-            case Type::UINT32: *(uint32_t*)dst = endian_swap<uint32_t, uint32_t>(*(uint32_t*)dst); break;
-            default: break;
-            }
-        }
-
-        return stride;
-    };
-
-    if (isBinary)
-    {
-        read = [this, &listSize, &dummyCount, &read_list_binary](PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & destOffset, size_t destSize, std::istream & _is)
-        {
-            if (!p.isList)
-            {
-                return read_property_binary(f.prop_stride, dest + destOffset, destOffset, destSize, _is);
-            }
-            read_list_binary(p.listType, &listSize, dummyCount, f.list_stride, _is); // the list size
-            return read_property_binary(f.prop_stride * listSize, dest + destOffset, destOffset, destSize, _is); // properties in list
-        };
-        skip = [this, &listSize, &dummyCount, &read_list_binary](PropertyLookup & f, const PlyProperty & p, std::istream & _is) noexcept
-        {
-            if (!p.isList)
-            {
-                _is.read((char*)scratch, f.prop_stride);
-                return f.prop_stride;
-            }
-            read_list_binary(p.listType, &listSize, dummyCount, f.list_stride, _is); // the list size (does not count for memory alloc)
-            auto bytes_to_skip = f.prop_stride * listSize;
-            _is.ignore(bytes_to_skip);
-            return bytes_to_skip;
-        };
-    }
-    else
-    {
-        read = [this, &listSize, &dummyCount](PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & destOffset, size_t destSize, std::istream & _is)
-        {
-            if (!p.isList)
-            {
-                read_property_ascii(p.propertyType, f.prop_stride, dest + destOffset, destOffset, destSize, _is);
-            }
-            else
-            {
-                dummyCount = 0;
-                read_property_ascii(p.listType, f.list_stride, &listSize, dummyCount, sizeof(listSize), _is); // the list size
-                for (size_t i = 0; i < listSize; ++i)
-                {
-                    read_property_ascii(p.propertyType, f.prop_stride, dest + destOffset, destOffset, destSize, _is);
-                }
-            }
-        };
-        skip = [this, &listSize, &dummyCount, &skip_ascii_buffer](PropertyLookup & f, const PlyProperty & p, std::istream & _is) noexcept
-        {
-            skip_ascii_buffer.clear();
-            if (p.isList)
-            {
-                dummyCount = 0;
-                read_property_ascii(p.listType, f.list_stride, &listSize, dummyCount, sizeof(listSize), _is); // the list size (does not count for memory alloc)
-                for (size_t i = 0; i < listSize; ++i) _is >> skip_ascii_buffer; // properties in list
-                return listSize * f.prop_stride;
-            }
-            _is >> skip_ascii_buffer;
-            return f.prop_stride;
-        };
-    }
-
-    std::vector<std::vector<PropertyLookup>> element_property_lookup = make_property_lookup_table();
     size_t element_idx = 0;
-    size_t property_idx = 0;
-    ParsingHelper * helper {nullptr};
-
-    // This is the inner import loop
     for (auto & element : elements)
     {
-        for (size_t count = 0; count < element.size; ++count)
+        for (size_t row = 0; row < element.size; ++row)
         {
-            property_idx = 0;
-            for (auto & property : element.properties)
+            size_t property_idx = 0;
+            for (auto & prop : element.properties)
             {
-                PropertyLookup & lookup = element_property_lookup[element_idx][property_idx];
+                auto & lookup = element_prop_lut[element_idx][property_idx];
+                auto * helper = lookup.helper;
 
                 if (!lookup.skip)
                 {
-                    helper = lookup.helper;
-                    if (firstPass)
+                    if constexpr (FirstPass)
                     {
-                        helper->cursor->totalSizeBytes += skip(lookup, property, is);
+                        helper->cursor->totalSizeBytes += io::skip(lookup, prop, is, list_size, dummy_count);
 
-                        // These lines will be changed when tinyply supports
-                        // variable length lists. We add it here so our header data structure
-                        // contains enough info to write it back out again (e.g. transcoding).
-                        if (property.listCount == 0) property.listCount = listSize;
-                        if (property.listCount != listSize) throw std::runtime_error("variable length lists are not supported yet.");
+                        if (prop.listCount == 0) prop.listCount = list_size;
+                        if (prop.listCount != list_size)
+                            throw std::runtime_error("variable length lists unsupported");
                     }
                     else
                     {
-                        const size_t destSize = helper->data->buffer.size_bytes();
-                        read(lookup, property, helper->data->buffer.get(), helper->cursor->byteOffset, destSize, is);
+                        io::read(lookup, prop, helper->data->buffer.get(), helper->cursor->byteOffset, is, list_size, dummy_count);
                     }
                 }
                 else
                 {
-                    skip(lookup, property, is);
+                    io::skip(lookup, prop, is, list_size, dummy_count);
                 }
-                property_idx++;
+
+                ++property_idx;
             }
         }
-        element_idx++;
+
+        ++element_idx;
     }
 
-    // Reset istream position to the start of the data
-    if (firstPass) is.seekg(start, is.beg);
+    // rewind after first pass
+    if constexpr (FirstPass) is.seekg(file_start, is.beg);
+}
+
+void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool first_pass)
+{
+    if (isBinary)
+    {  
+        if (isBigEndian)
+        {
+            if (first_pass) parse_data_impl<true, true, true>(is);
+            else parse_data_impl<true, false, true>(is);
+        }
+        else
+        {
+            if (first_pass) parse_data_impl<true, true, false>(is);
+            else parse_data_impl<true, false, false>(is);
+        }
+    }
+    else
+    {
+        if (first_pass)  parse_data_impl<false, true, false>(is);
+        else  parse_data_impl<false, false, false>(is);
+    }
 }
 
 // Wrap the public interface:
