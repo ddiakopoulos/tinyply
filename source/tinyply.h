@@ -27,6 +27,7 @@
 #include <string>
 #include <stdint.h>
 #include <cstddef>
+#include <cstring>
 #include <sstream>
 #include <memory>
 #include <unordered_map>
@@ -260,6 +261,13 @@ template<typename T> inline void ply_cast_ascii(void* dest, std::istream & is)
     *(static_cast<T*>(dest)) = ply_read_ascii<T>(is);
 }
 
+// Fast binary read bypassing iostream overhead by going directly to streambuf
+inline void fast_read(std::istream& is, char* dest, std::streamsize count)
+{
+    if (is.rdbuf()->sgetn(dest, count) != count)
+        throw std::runtime_error("failed to read binary data (unexpected EOF or stream error)");
+}
+
 // Special case mirroring read_property_binary but for list types; this
 // has an additional big endian check to flip the data in place immediately
 // after reading. We do this as a performance optimization; endian flipping is
@@ -268,9 +276,7 @@ template<typename T> inline void ply_cast_ascii(void* dest, std::istream & is)
 inline size_t read_list_binary_be(const Type & t, const size_t& stride, void * dest, size_t & destOffset,  std::istream & is)
 {
     destOffset += stride;
-    is.read((char*)dest, stride);
-    if (is.fail())
-        throw std::runtime_error("failed to read binary data (unexpected EOF or stream error)");
+    fast_read(is, (char*)dest, stride);
 
     switch (t)
     {
@@ -286,9 +292,7 @@ inline size_t read_list_binary_be(const Type & t, const size_t& stride, void * d
 inline size_t read_property_binary(const size_t & stride, void * dest, size_t & destOffset, std::istream & is)
 {
     destOffset += stride;
-    is.read((char*)dest, stride);
-    if (is.fail())
-        throw std::runtime_error("failed to read binary data (unexpected EOF or stream error)");
+    fast_read(is, (char*)dest, stride);
     return stride;
 }
 
@@ -334,6 +338,14 @@ struct PlyFile::PlyFileImpl
         size_t list_stride{ 0 }; // precomputed
     };
 
+    struct ElementLayoutInfo
+    {
+        bool is_fixed_layout{ false };
+        size_t row_stride{ 0 };
+        std::vector<size_t> property_offsets;
+        std::vector<size_t> property_sizes;
+    };
+
     std::unordered_map<uint32_t, ParsingHelper> userData;
 
     bool isBinary = false;
@@ -358,6 +370,13 @@ struct PlyFile::PlyFileImpl
 
     size_t compute_batch_size(const std::vector<PropertyLookup> & lookups,
         const std::vector<PlyProperty> & properties, size_t start_idx) const;
+
+    ElementLayoutInfo compute_element_layout(const PlyElement & element,
+        const std::vector<PropertyLookup> & lookups) const;
+
+    bool check_fast_path_eligible(const PlyElement & element,
+        const std::vector<PropertyLookup> & lookups,
+        const ElementLayoutInfo & layout) const;
 
     bool parse_header(std::istream & is);
 
@@ -598,6 +617,69 @@ size_t PlyFile::PlyFileImpl::compute_batch_size(const std::vector<PropertyLookup
     return count;
 }
 
+PlyFile::PlyFileImpl::ElementLayoutInfo
+PlyFile::PlyFileImpl::compute_element_layout(const PlyElement & element,
+    const std::vector<PropertyLookup> & lookups) const
+{
+    ElementLayoutInfo info;
+    info.is_fixed_layout = true;
+    info.row_stride = 0;
+
+    for (size_t i = 0; i < element.properties.size(); ++i)
+    {
+        const auto & prop = element.properties[i];
+        const auto & lookup = lookups[i];
+
+        info.property_offsets.push_back(info.row_stride);
+
+        if (prop.isList)
+        {
+            uint32_t list_count = static_cast<uint32_t>(prop.listCount);
+            if (list_count == 0 && lookup.helper)
+                list_count = lookup.helper->list_size_hint;
+
+            if (list_count == 0)
+            {
+                // Variable-length list without hint - cannot use bulk read
+                info.is_fixed_layout = false;
+                return info;
+            }
+
+            size_t bytes = lookup.list_stride + (lookup.prop_stride * list_count);
+            info.property_sizes.push_back(bytes);
+            info.row_stride += bytes;
+        }
+        else
+        {
+            info.property_sizes.push_back(lookup.prop_stride);
+            info.row_stride += lookup.prop_stride;
+        }
+    }
+    return info;
+}
+
+bool PlyFile::PlyFileImpl::check_fast_path_eligible(const PlyElement & element,
+    const std::vector<PropertyLookup> & lookups,
+    const ElementLayoutInfo & layout) const
+{
+    // Must be fixed layout
+    if (!layout.is_fixed_layout) return false;
+
+    // All properties must be requested, same helper, no lists
+    ParsingHelper * first_helper = nullptr;
+    for (size_t i = 0; i < lookups.size(); ++i)
+    {
+        if (lookups[i].skip) return false;
+        if (element.properties[i].isList) return false;
+
+        if (!first_helper)
+            first_helper = lookups[i].helper;
+        else if (lookups[i].helper != first_helper)
+            return false;
+    }
+    return first_helper != nullptr;
+}
+
 bool PlyFile::PlyFileImpl::parse_header(std::istream & is)
 {
     std::string line;
@@ -701,15 +783,8 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
             auto & helper = entry.second;
             if (helper.data->isList && !helper.temp_list_sizes.empty())
             {
-                bool all_same = std::adjacent_find(
-                    helper.temp_list_sizes.begin(),
-                    helper.temp_list_sizes.end(),
-                    std::not_equal_to<size_t>()
-                ) == helper.temp_list_sizes.end();
-
-                if (!all_same)
-                    helper.data->list_sizes = std::move(helper.temp_list_sizes);
-
+                bool all_same = std::adjacent_find( helper.temp_list_sizes.begin(), helper.temp_list_sizes.end(), std::not_equal_to<size_t>()) == helper.temp_list_sizes.end();
+                if (!all_same) helper.data->list_sizes = std::move(helper.temp_list_sizes);
                 helper.temp_list_sizes.clear();
                 helper.temp_list_sizes.shrink_to_fit();
             }
@@ -1059,12 +1134,81 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
         }
     }
 
+    // Compute element layouts for bulk read optimization
+    std::vector<ElementLayoutInfo> element_layouts;
+    element_layouts.reserve(elements.size());
+    for (size_t ei = 0; ei < elements.size(); ++ei)
+        element_layouts.push_back(compute_element_layout(elements[ei], element_prop_lut[ei]));
+
+    // Reusable bulk buffer for bulk read path
+    std::vector<uint8_t> bulk_buffer;
+
     size_t element_idx = 0;
     for (auto & element : elements)
     {
         const auto & lookups = element_prop_lut[element_idx];
         const auto & batches = element_batches[element_idx];
+        const auto & layout = element_layouts[element_idx];
 
+        // fast path (requirements: binary, second pass, little-endian, all properties requested to same buffer, no lists)
+        if constexpr (IsBinary && !FirstPass && !IsBigEndian)
+        {
+            if (check_fast_path_eligible(element, lookups, layout) && element.size > 0)
+            {
+                auto * helper = lookups[0].helper;
+                const size_t total_bytes = element.size * layout.row_stride;
+                fast_read(is, reinterpret_cast<char*>(helper->data->buffer.get() + helper->cursor->byteOffset), total_bytes);
+                helper->cursor->byteOffset += total_bytes;
+                ++element_idx;
+                continue;
+            }
+        }
+
+        // bulk read (required: binary, second pass, fixed layout)
+        if constexpr (IsBinary && !FirstPass)
+        {
+            if (layout.is_fixed_layout && element.size > 0)
+            {
+                const size_t total_bytes = element.size * layout.row_stride;
+                bulk_buffer.resize(total_bytes);
+                fast_read(is, reinterpret_cast<char*>(bulk_buffer.data()), total_bytes);
+
+                // Extract requested properties from bulk buffer
+                for (size_t row = 0; row < element.size; ++row)
+                {
+                    const uint8_t* row_ptr = bulk_buffer.data() + (row * layout.row_stride);
+
+                    for (size_t pi = 0; pi < lookups.size(); ++pi)
+                    {
+                        const auto & lookup = lookups[pi];
+                        if (lookup.skip) continue;
+
+                        auto * helper = lookup.helper;
+                        const auto & prop = element.properties[pi];
+                        const size_t prop_offset = layout.property_offsets[pi];
+
+                        if (prop.isList)
+                        {
+                            // Skip list count prefix, copy data
+                            uint32_t lc = prop.listCount ? static_cast<uint32_t>(prop.listCount) : helper->list_size_hint;
+                            size_t data_size = lookup.prop_stride * lc;
+                            std::memcpy(helper->data->buffer.get() + helper->cursor->byteOffset, row_ptr + prop_offset + lookup.list_stride, data_size);
+                            helper->cursor->byteOffset += data_size;
+                        }
+                        else
+                        {
+                            std::memcpy(helper->data->buffer.get() + helper->cursor->byteOffset, row_ptr + prop_offset, layout.property_sizes[pi]);
+                            helper->cursor->byteOffset += layout.property_sizes[pi];
+                        }
+                    }
+                }
+
+                ++element_idx;
+                continue;
+            }
+        }
+
+        // slow row-by-row lookup (required: ascii, first pass, or variable-length lists)
         for (size_t row = 0; row < element.size; ++row)
         {
             for (const auto & batch : batches)
@@ -1120,7 +1264,7 @@ void PlyFile::PlyFileImpl::parse_data(std::istream & is, bool first_pass)
     }
     else
     {
-        if (first_pass)  parse_data_impl<false, true, false>(is);
+        if (first_pass) parse_data_impl<false, true, false>(is);
         else  parse_data_impl<false, false, false>(is);
     }
 }
