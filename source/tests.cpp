@@ -327,23 +327,43 @@ TEST_CASE("check for invalid strings in the header")
 }
 
 // Reported via https://github.com/vilya/ply-parsing-perf
-TEST_CASE("check that variable length lists are unsupported (without crashing)")
+TEST_CASE("check that variable length lists are supported")
 {
-    auto variable_length_test = [](const std::string & filepath)
+    // Test kcrane.city.ply (only has vertex_indices, no texcoord)
     {
-        std::ifstream filestream(filepath, std::ios::binary);
+        std::ifstream filestream("../assets/validate/valid/kcrane.city.ply", std::ios::binary);
         PlyFile file;
         bool header_result = file.parse_header(filestream);
         REQUIRE(header_result);
 
         std::shared_ptr<PlyData> faces;
-        faces = file.request_properties_from_element("face", { "vertex_indices" }, 0); 
+        faces = file.request_properties_from_element("face", { "vertex_indices" }, 0);
 
-       file.read(filestream);
-    };
+        file.read(filestream);
 
-    CHECK_THROWS(variable_length_test("../assets/validate/valid/tet.ascii.variable-length.ply"));
-    CHECK_THROWS(variable_length_test("../assets/validate/valid/kcrane.city.ply"));
+        // Verify variable-length lists were detected
+        REQUIRE(faces->list_sizes.size() == faces->count);
+    }
+
+    // Test tet.ascii.variable-length.ply with both properties
+    {
+        std::ifstream filestream("../assets/validate/valid/tet.ascii.variable-length.ply", std::ios::binary);
+        PlyFile file;
+        bool header_result = file.parse_header(filestream);
+        REQUIRE(header_result);
+
+        std::shared_ptr<PlyData> faces;
+        std::shared_ptr<PlyData> texcoords;
+        faces = file.request_properties_from_element("face", { "vertex_indices" }, 0);
+        texcoords = file.request_properties_from_element("face", { "texcoord" }, 0);
+
+        file.read(filestream);
+
+        // vertex_indices has variable lengths (3 and 4)
+        REQUIRE(faces->list_sizes.size() == faces->count);
+        // texcoords all have same length (6), so list_sizes should be empty
+        REQUIRE(texcoords->list_sizes.empty());
+    }
 }
 
 TEST_CASE("check that int128 is an unrecognized, non-conformant datatype")
@@ -462,10 +482,10 @@ TEST_CASE("payload.ignored-face-components.ply")
     CHECK_NOTHROW(parse_ply_file("../assets/validate/invalid/payload.ignored-face-components.ply"));
 }
 
-// This file has variable length lists which are unsupported
+// This file has variable length lists which are now supported
 TEST_CASE("payload.ignored-vertex-components.ply")
 {
-    CHECK_THROWS(parse_ply_file("../assets/validate/invalid/payload.ignored-vertex-components.ply"));
+    CHECK_NOTHROW(parse_ply_file("../assets/validate/invalid/payload.ignored-vertex-components.ply"));
 }
 
 // This file tests unaligned memory access - should handle gracefully

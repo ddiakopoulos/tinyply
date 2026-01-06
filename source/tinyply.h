@@ -94,6 +94,7 @@ namespace tinyply
         Buffer buffer;
         size_t count {0};
         bool isList {false};
+        std::vector<size_t> list_sizes; // per-item list counts (empty = fixed-length)
     };
 
     struct PlyProperty
@@ -322,6 +323,7 @@ struct PlyFile::PlyFileImpl
         std::shared_ptr<PlyData> data;
         std::shared_ptr<PlyDataCursor> cursor;
         uint32_t list_size_hint;
+        std::vector<size_t> temp_list_sizes; // collect during first pass
     };
 
     struct PropertyLookup
@@ -475,9 +477,13 @@ namespace io
                 return f.prop_stride * list_size;
             }
 
-            is >> junk;
-            if (is.fail()) throw std::runtime_error("failed to skip ascii property value");
-            return f.prop_stride;
+            // Skip batch_read values for batched non-list properties
+            for (size_t i = 0; i < batch_read; ++i)
+            {
+                is >> junk;
+                if (is.fail()) throw std::runtime_error("failed to skip ascii property value");
+            }
+            return f.prop_stride * batch_read;
 
         }
     };
@@ -688,6 +694,26 @@ void PlyFile::PlyFileImpl::read(std::istream & is)
     if (list_hints == 0)
     {
         parse_data(is, true);
+
+        // Process collected list sizes: detect fixed vs variable-length
+        for (auto & entry : userData)
+        {
+            auto & helper = entry.second;
+            if (helper.data->isList && !helper.temp_list_sizes.empty())
+            {
+                bool all_same = std::adjacent_find(
+                    helper.temp_list_sizes.begin(),
+                    helper.temp_list_sizes.end(),
+                    std::not_equal_to<size_t>()
+                ) == helper.temp_list_sizes.end();
+
+                if (!all_same)
+                    helper.data->list_sizes = std::move(helper.temp_list_sizes);
+
+                helper.temp_list_sizes.clear();
+                helper.temp_list_sizes.shrink_to_fit();
+            }
+        }
     }
 
     // Count the number of properties (required for allocation)
@@ -1055,10 +1081,8 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
                     if constexpr (FirstPass)
                     {
                         helper->cursor->totalSizeBytes += io::skip(lookup, prop, is, list_size, dummy_count, batch_size);
-
-                        if (prop.listCount == 0) prop.listCount = list_size;
-                        if (prop.listCount != list_size)
-                            throw std::runtime_error("variable length lists unsupported");
+                        if (prop.isList)
+                            helper->temp_list_sizes.push_back(list_size);
                     }
                     else
                     {
