@@ -341,6 +341,8 @@ struct PlyFile::PlyFileImpl
     struct ElementLayoutInfo
     {
         bool is_fixed_layout{ false };
+        bool fast_path_eligible{ false };           // direct copy possible (all props to same buffer, no lists)
+        ParsingHelper* fast_path_helper{ nullptr }; // destination for fast path
         size_t row_stride{ 0 };
         std::vector<size_t> property_offsets;
         std::vector<size_t> property_sizes;
@@ -355,6 +357,13 @@ struct PlyFile::PlyFileImpl
     std::vector<std::string> objInfo;
     uint8_t scratch[64]; // large enough for max list size
 
+    // Cached parsing state (computed once, reused between passes)
+    std::vector<std::vector<PropertyLookup>> cached_property_lut;
+    std::vector<std::vector<std::pair<size_t, size_t>>> cached_batches; // {start_idx, batch_size}
+    std::vector<ElementLayoutInfo> cached_layouts;
+    bool parsing_state_cached{ false };
+
+    void ensure_parsing_state_cached();
     void read(std::istream & is);
     void write(std::ostream & os, bool isBinary);
 
@@ -373,10 +382,6 @@ struct PlyFile::PlyFileImpl
 
     ElementLayoutInfo compute_element_layout(const PlyElement & element,
         const std::vector<PropertyLookup> & lookups) const;
-
-    bool check_fast_path_eligible(const PlyElement & element,
-        const std::vector<PropertyLookup> & lookups,
-        const ElementLayoutInfo & layout) const;
 
     bool parse_header(std::istream & is);
 
@@ -399,18 +404,21 @@ struct PlyFile::PlyFileImpl
 
 namespace io
 {
-    template <bool IsBinary, bool isBigEndian>
+    template <bool IsBinary, bool IsBigEndian>
     struct property_io;
 
-    // binary little-endian specialization
-    template <>
-    struct property_io<true, false>
+    // Unified binary specialization for both little and big endian
+    template <bool IsBigEndian>
+    struct property_io<true, IsBigEndian>
     {
         static inline size_t read(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & dest_off, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read)
         {
             if (p.isList)
             {
-                read_property_binary(f.list_stride, &list_size, dummy_count, is);
+                if constexpr (IsBigEndian)
+                    read_list_binary_be(p.listType, f.list_stride, &list_size, dummy_count, is);
+                else
+                    read_property_binary(f.list_stride, &list_size, dummy_count, is);
                 return read_property_binary(f.prop_stride * list_size, dest + dest_off, dest_off, is);
             }
             return read_property_binary(f.prop_stride * batch_read, dest + dest_off, dest_off, is);
@@ -420,46 +428,15 @@ namespace io
         {
             if (p.isList)
             {
-                // read the list
-                read_property_binary(f.list_stride, &list_size, dummy_count, is);
+                if constexpr (IsBigEndian)
+                    read_list_binary_be(p.listType, f.list_stride, &list_size, dummy_count, is);
+                else
+                    read_property_binary(f.list_stride, &list_size, dummy_count, is);
                 const size_t bytes = f.prop_stride * list_size;
                 is.ignore(bytes);
                 if (is.fail()) throw std::runtime_error("failed to skip binary data (unexpected EOF or stream error)");
                 return bytes;
             }
-
-            is.ignore(f.prop_stride * batch_read);
-            if (is.fail()) throw std::runtime_error("failed to skip binary data (unexpected EOF or stream error)");
-            return f.prop_stride * batch_read;
-        }
-    };
-
-    // binary big-endian specialization
-    template <>
-    struct property_io<true, true>
-    {
-        static inline size_t read(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & dest_off, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read)
-        {
-            if (p.isList)
-            {
-                read_list_binary_be(p.listType, f.list_stride, &list_size, dummy_count, is);
-                return read_property_binary(f.prop_stride * list_size, dest + dest_off, dest_off, is);
-            }
-            return read_property_binary(f.prop_stride * batch_read, dest + dest_off, dest_off, is);
-        }
-
-        static inline size_t skip(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read)
-        {
-            if (p.isList)
-            {
-                // read the list
-                read_list_binary_be(p.listType, f.list_stride, &list_size, dummy_count, is);
-                const size_t bytes = f.prop_stride * list_size;
-                is.ignore(bytes);
-                if (is.fail()) throw std::runtime_error("failed to skip binary data (unexpected EOF or stream error)");
-                return bytes;
-            }
-
             is.ignore(f.prop_stride * batch_read);
             if (is.fail()) throw std::runtime_error("failed to skip binary data (unexpected EOF or stream error)");
             return f.prop_stride * batch_read;
@@ -617,13 +594,14 @@ size_t PlyFile::PlyFileImpl::compute_batch_size(const std::vector<PropertyLookup
     return count;
 }
 
-PlyFile::PlyFileImpl::ElementLayoutInfo
-PlyFile::PlyFileImpl::compute_element_layout(const PlyElement & element,
-    const std::vector<PropertyLookup> & lookups) const
+PlyFile::PlyFileImpl::ElementLayoutInfo PlyFile::PlyFileImpl::compute_element_layout(const PlyElement & element, const std::vector<PropertyLookup> & lookups) const
 {
     ElementLayoutInfo info;
     info.is_fixed_layout = true;
+    info.fast_path_eligible = true;  // assume eligible until proven otherwise
     info.row_stride = 0;
+
+    ParsingHelper * first_helper = nullptr;
 
     for (size_t i = 0; i < element.properties.size(); ++i)
     {
@@ -631,6 +609,14 @@ PlyFile::PlyFileImpl::compute_element_layout(const PlyElement & element,
         const auto & lookup = lookups[i];
 
         info.property_offsets.push_back(info.row_stride);
+
+        // Fast path eligibility: all properties requested, same helper, no lists
+        if (info.fast_path_eligible)
+        {
+            if      (lookup.skip || prop.isList) info.fast_path_eligible = false;
+            else if (!first_helper) first_helper = lookup.helper;
+            else if (lookup.helper != first_helper) info.fast_path_eligible = false;
+        }
 
         if (prop.isList)
         {
@@ -642,6 +628,7 @@ PlyFile::PlyFileImpl::compute_element_layout(const PlyElement & element,
             {
                 // Variable-length list without hint - cannot use bulk read
                 info.is_fixed_layout = false;
+                info.fast_path_eligible = false;
                 return info;
             }
 
@@ -655,29 +642,39 @@ PlyFile::PlyFileImpl::compute_element_layout(const PlyElement & element,
             info.row_stride += lookup.prop_stride;
         }
     }
+
+    if (info.fast_path_eligible && first_helper) info.fast_path_helper = first_helper;
+    else info.fast_path_eligible = false;
+
     return info;
 }
 
-bool PlyFile::PlyFileImpl::check_fast_path_eligible(const PlyElement & element,
-    const std::vector<PropertyLookup> & lookups,
-    const ElementLayoutInfo & layout) const
+void PlyFile::PlyFileImpl::ensure_parsing_state_cached()
 {
-    // Must be fixed layout
-    if (!layout.is_fixed_layout) return false;
+    if (parsing_state_cached) return;
 
-    // All properties must be requested, same helper, no lists
-    ParsingHelper * first_helper = nullptr;
-    for (size_t i = 0; i < lookups.size(); ++i)
+    cached_property_lut = make_property_lookup_table();
+
+    // Precompute batches
+    cached_batches.resize(elements.size());
+    for (size_t ei = 0; ei < elements.size(); ++ei)
     {
-        if (lookups[i].skip) return false;
-        if (element.properties[i].isList) return false;
-
-        if (!first_helper)
-            first_helper = lookups[i].helper;
-        else if (lookups[i].helper != first_helper)
-            return false;
+        const auto & lookups = cached_property_lut[ei];
+        const auto & props = elements[ei].properties;
+        for (size_t idx = 0; idx < props.size(); )
+        {
+            size_t batch_size = compute_batch_size(lookups, props, idx);
+            cached_batches[ei].push_back({idx, batch_size});
+            idx += batch_size;
+        }
     }
-    return first_helper != nullptr;
+
+    // Precompute layouts
+    cached_layouts.reserve(elements.size());
+    for (size_t ei = 0; ei < elements.size(); ++ei)
+        cached_layouts.push_back(compute_element_layout(elements[ei], cached_property_lut[ei]));
+
+    parsing_state_cached = true;
 }
 
 bool PlyFile::PlyFileImpl::parse_header(std::istream & is)
@@ -1114,31 +1111,11 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
     uint32_t   list_size = 0;
     size_t     dummy_count = 0;
 
-    auto element_prop_lut = make_property_lookup_table();
-
-    // Precompute batch info for all elements (batch sizes don't change between rows)
-    struct BatchInfo { size_t start_idx; size_t batch_size; };
-    std::vector<std::vector<BatchInfo>> element_batches(elements.size());
-
-    for (size_t ei = 0; ei < elements.size(); ++ei)
-    {
-        const auto & lookups = element_prop_lut[ei];
-        const auto & props = elements[ei].properties;
-        auto & batches = element_batches[ei];
-
-        for (size_t idx = 0; idx < props.size(); )
-        {
-            size_t batch_size = compute_batch_size(lookups, props, idx);
-            batches.push_back({idx, batch_size});
-            idx += batch_size;
-        }
-    }
-
-    // Compute element layouts for bulk read optimization
-    std::vector<ElementLayoutInfo> element_layouts;
-    element_layouts.reserve(elements.size());
-    for (size_t ei = 0; ei < elements.size(); ++ei)
-        element_layouts.push_back(compute_element_layout(elements[ei], element_prop_lut[ei]));
+    // Use cached parsing state (computed once, reused between passes)
+    ensure_parsing_state_cached();
+    const auto & element_prop_lut = cached_property_lut;
+    const auto & element_batches = cached_batches;
+    const auto & element_layouts = cached_layouts;
 
     // Reusable bulk buffer for bulk read path
     std::vector<uint8_t> bulk_buffer;
@@ -1150,30 +1127,29 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
         const auto & batches = element_batches[element_idx];
         const auto & layout = element_layouts[element_idx];
 
-        // fast path (requirements: binary, second pass, little-endian, all properties requested to same buffer, no lists)
-        if constexpr (IsBinary && !FirstPass && !IsBigEndian)
-        {
-            if (check_fast_path_eligible(element, lookups, layout) && element.size > 0)
-            {
-                auto * helper = lookups[0].helper;
-                const size_t total_bytes = element.size * layout.row_stride;
-                fast_read(is, reinterpret_cast<char*>(helper->data->buffer.get() + helper->cursor->byteOffset), total_bytes);
-                helper->cursor->byteOffset += total_bytes;
-                ++element_idx;
-                continue;
-            }
-        }
-
-        // bulk read (required: binary, second pass, fixed layout)
+        // Binary second pass optimization: bulk read with optional fast path
         if constexpr (IsBinary && !FirstPass)
         {
             if (layout.is_fixed_layout && element.size > 0)
             {
                 const size_t total_bytes = element.size * layout.row_stride;
+
+                // Fast path: direct read when layout matches output buffer exactly (little-endian only)
+                if constexpr (!IsBigEndian)
+                {
+                    if (layout.fast_path_eligible)
+                    {
+                        fast_read(is, reinterpret_cast<char*>(layout.fast_path_helper->data->buffer.get() + layout.fast_path_helper->cursor->byteOffset), total_bytes);
+                        layout.fast_path_helper->cursor->byteOffset += total_bytes;
+                        ++element_idx;
+                        continue;
+                    }
+                }
+
+                // Bulk read: read entire element, then scatter to individual buffers
                 bulk_buffer.resize(total_bytes);
                 fast_read(is, reinterpret_cast<char*>(bulk_buffer.data()), total_bytes);
 
-                // Extract requested properties from bulk buffer
                 for (size_t row = 0; row < element.size; ++row)
                 {
                     const uint8_t* row_ptr = bulk_buffer.data() + (row * layout.row_stride);
@@ -1189,7 +1165,6 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
 
                         if (prop.isList)
                         {
-                            // Skip list count prefix, copy data
                             uint32_t lc = prop.listCount ? static_cast<uint32_t>(prop.listCount) : helper->list_size_hint;
                             size_t data_size = lookup.prop_stride * lc;
                             std::memcpy(helper->data->buffer.get() + helper->cursor->byteOffset, row_ptr + prop_offset + lookup.list_stride, data_size);
@@ -1213,8 +1188,8 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
         {
             for (const auto & batch : batches)
             {
-                const size_t batch_idx = batch.start_idx;
-                const size_t batch_size = batch.batch_size;
+                const size_t batch_idx = batch.first;    // start_idx
+                const size_t batch_size = batch.second;  // batch_size
 
                 PlyProperty & prop = element.properties[batch_idx];
                 const auto & lookup = lookups[batch_idx];
