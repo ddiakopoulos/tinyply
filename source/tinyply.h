@@ -249,6 +249,8 @@ template<typename T> inline T ply_read_ascii(std::istream & is)
 {
     T data;
     is >> data;
+    if (is.fail())
+        throw std::runtime_error("failed to read ascii property value");
     return data;
 }
 
@@ -266,6 +268,8 @@ inline size_t read_list_binary_be(const Type & t, const size_t& stride, void * d
 {
     destOffset += stride;
     is.read((char*)dest, stride);
+    if (is.fail())
+        throw std::runtime_error("failed to read binary data (unexpected EOF or stream error)");
 
     switch (t)
     {
@@ -282,6 +286,8 @@ inline size_t read_property_binary(const size_t & stride, void * dest, size_t & 
 {
     destOffset += stride;
     is.read((char*)dest, stride);
+    if (is.fail())
+        throw std::runtime_error("failed to read binary data (unexpected EOF or stream error)");
     return stride;
 }
 
@@ -379,7 +385,7 @@ namespace io
     template <>
     struct property_io<true, false>
     {
-        static inline size_t read(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & dest_off, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read) noexcept
+        static inline size_t read(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & dest_off, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read)
         {
             if (p.isList)
             {
@@ -389,7 +395,7 @@ namespace io
             return read_property_binary(f.prop_stride * batch_read, dest + dest_off, dest_off, is);
         }
 
-        static inline size_t skip(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read) noexcept
+        static inline size_t skip(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read)
         {
             if (p.isList)
             {
@@ -397,10 +403,12 @@ namespace io
                 read_property_binary(f.list_stride, &list_size, dummy_count, is);
                 const size_t bytes = f.prop_stride * list_size;
                 is.ignore(bytes);
+                if (is.fail()) throw std::runtime_error("failed to skip binary data (unexpected EOF or stream error)");
                 return bytes;
             }
 
             is.ignore(f.prop_stride * batch_read);
+            if (is.fail()) throw std::runtime_error("failed to skip binary data (unexpected EOF or stream error)");
             return f.prop_stride * batch_read;
         }
     };
@@ -409,7 +417,7 @@ namespace io
     template <>
     struct property_io<true, true>
     {
-        static inline size_t read(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & dest_off, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read) noexcept
+        static inline size_t read(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, uint8_t * dest, size_t & dest_off, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read)
         {
             if (p.isList)
             {
@@ -419,7 +427,7 @@ namespace io
             return read_property_binary(f.prop_stride * batch_read, dest + dest_off, dest_off, is);
         }
 
-        static inline size_t skip(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read) noexcept
+        static inline size_t skip(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read)
         {
             if (p.isList)
             {
@@ -427,10 +435,12 @@ namespace io
                 read_list_binary_be(p.listType, f.list_stride, &list_size, dummy_count, is);
                 const size_t bytes = f.prop_stride * list_size;
                 is.ignore(bytes);
+                if (is.fail()) throw std::runtime_error("failed to skip binary data (unexpected EOF or stream error)");
                 return bytes;
             }
 
             is.ignore(f.prop_stride * batch_read);
+            if (is.fail()) throw std::runtime_error("failed to skip binary data (unexpected EOF or stream error)");
             return f.prop_stride * batch_read;
         }
     };
@@ -445,10 +455,7 @@ namespace io
             {
                 // list header (count)
                 read_property_ascii(p.listType, f.list_stride, &list_size, dummy_count, is);
-
-                for (size_t i = 0; i < list_size; ++i)
-                    read_property_ascii(p.propertyType, f.prop_stride, dest + dest_off, dest_off, is);
-
+                for (size_t i = 0; i < list_size; ++i) read_property_ascii(p.propertyType, f.prop_stride, dest + dest_off, dest_off, is);
                 return f.prop_stride * list_size;
             }
             return static_cast<size_t>(read_property_ascii(p.propertyType, f.prop_stride, dest + dest_off, dest_off, is));
@@ -457,15 +464,19 @@ namespace io
         static inline size_t skip(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read)
         {
             std::string junk;
-            if (p.isList) 
-            { 
+            if (p.isList)
+            {
                 read_property_ascii(p.listType, f.list_stride, &list_size, dummy_count, is);
-                for (size_t i = 0; i < list_size; ++i) is >> junk;
-
+                for (size_t i = 0; i < list_size; ++i)
+                {
+                    is >> junk;
+                    if (is.fail()) throw std::runtime_error("failed to skip ascii property value");
+                }
                 return f.prop_stride * list_size;
             }
 
-            is >> junk; 
+            is >> junk;
+            if (is.fail()) throw std::runtime_error("failed to skip ascii property value");
             return f.prop_stride;
 
         }
@@ -490,7 +501,11 @@ PlyProperty::PlyProperty(std::istream & is) : isList(false)
 
 PlyElement::PlyElement(std::istream & is)
 {
-    is >> name >> size;
+    int64_t count;
+    is >> name >> count;
+    if (count < 0)
+        throw std::runtime_error("element count is negative");
+    size = static_cast<size_t>(count);
 }
 
 int64_t find_element(const std::string & key, const std::vector<PlyElement> & list)
@@ -537,8 +552,7 @@ std::vector<std::vector<PlyFile::PlyFileImpl::PropertyLookup>> PlyFile::PlyFileI
     return element_property_lookup;
 }
 
-size_t PlyFile::PlyFileImpl::compute_batch_size(const std::vector<PropertyLookup> & lookups,
-    const std::vector<PlyProperty> & properties, size_t start_idx) const
+size_t PlyFile::PlyFileImpl::compute_batch_size(const std::vector<PropertyLookup> & lookups, const std::vector<PlyProperty> & properties, size_t start_idx) const
 {
     if (start_idx >= lookups.size()) return 0;
 
@@ -552,12 +566,13 @@ size_t PlyFile::PlyFileImpl::compute_batch_size(const std::vector<PropertyLookup
 
     if (first_lookup.skip)
     {
-        // Count consecutive skipped non-list properties
+        // Count consecutive skipped non-list properties with the same stride
         while (start_idx + count < lookups.size())
         {
             const auto & next_lookup = lookups[start_idx + count];
             const auto & next_prop = properties[start_idx + count];
-            if (!next_lookup.skip || next_prop.isList) break;
+            // Only batch if same stride, otherwise skip would compute wrong bytes
+            if (!next_lookup.skip || next_prop.isList || next_lookup.prop_stride != first_lookup.prop_stride) break;
             count++;
         }
     }
@@ -581,6 +596,7 @@ bool PlyFile::PlyFileImpl::parse_header(std::istream & is)
 {
     std::string line;
     bool success = true;
+    bool found_end_header = false;
     while (std::getline(is, line))
     {
         std::istringstream ls(line);
@@ -592,9 +608,22 @@ bool PlyFile::PlyFileImpl::parse_header(std::istream & is)
         else if (token == "element")    read_header_element(ls);
         else if (token == "property")   read_header_property(ls);
         else if (token == "obj_info")   read_header_text(line, objInfo, 9);
-        else if (token == "end_header") break;
+        else if (token == "end_header") { found_end_header = true; break; }
         else success = false; // unexpected header field
     }
+
+    if (!found_end_header) throw std::runtime_error("header is malformed: missing end_header");
+
+    // Validate all properties have valid types
+    for (const auto & e : elements)
+    {
+        for (const auto & p : e.properties)
+        {
+            if (p.propertyType == Type::INVALID)  success = false;
+            if (p.isList && p.listType == Type::INVALID) success = false;
+        }
+    }
+
     return success;
 }
 
@@ -986,16 +1015,36 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
 
     auto element_prop_lut = make_property_lookup_table();
 
+    // Precompute batch info for all elements (batch sizes don't change between rows)
+    struct BatchInfo { size_t start_idx; size_t batch_size; };
+    std::vector<std::vector<BatchInfo>> element_batches(elements.size());
+
+    for (size_t ei = 0; ei < elements.size(); ++ei)
+    {
+        const auto & lookups = element_prop_lut[ei];
+        const auto & props = elements[ei].properties;
+        auto & batches = element_batches[ei];
+
+        for (size_t idx = 0; idx < props.size(); )
+        {
+            size_t batch_size = compute_batch_size(lookups, props, idx);
+            batches.push_back({idx, batch_size});
+            idx += batch_size;
+        }
+    }
+
     size_t element_idx = 0;
     for (auto & element : elements)
     {
         const auto & lookups = element_prop_lut[element_idx];
+        const auto & batches = element_batches[element_idx];
 
         for (size_t row = 0; row < element.size; ++row)
         {
-            for (size_t batch_idx = 0; batch_idx < element.properties.size(); )
+            for (const auto & batch : batches)
             {
-                const size_t batch_size = compute_batch_size(lookups, element.properties, batch_idx);
+                const size_t batch_idx = batch.start_idx;
+                const size_t batch_size = batch.batch_size;
 
                 PlyProperty & prop = element.properties[batch_idx];
                 const auto & lookup = lookups[batch_idx];
@@ -1020,8 +1069,6 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
                 {
                     io::skip(lookup, prop, is, list_size, dummy_count, batch_size);
                 }
-
-                batch_idx += batch_size;
             }
         }
 
