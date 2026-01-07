@@ -268,25 +268,57 @@ inline void fast_read(std::istream& is, char* dest, std::streamsize count)
         throw std::runtime_error("failed to read binary data (unexpected EOF or stream error)");
 }
 
-// Special case mirroring read_property_binary but for list types; this
-// has an additional big endian check to flip the data in place immediately
-// after reading. We do this as a performance optimization; endian flipping is
-// done on regular properties as a post-process after reading (also for optimization)
-// but we need the correct little-endian list count as we read the file.
-inline size_t read_list_binary_be(const Type & t, const size_t& stride, void * dest, size_t & destOffset,  std::istream & is)
+// Read a list count value from binary stream. The count is stored in a uint32_t
+// regardless of the source type (int8, uint8, int16, uint16, int32, uint32).
+// For big-endian files, the value is byte-swapped immediately.
+// IMPORTANT: This function safely reads list counts of any valid integer type
+// into a uint32_t destination, avoiding buffer overflows.
+inline size_t read_list_count_binary(const Type & t, const size_t& stride, uint32_t * dest, size_t & destOffset, std::istream & is, bool isBigEndian)
 {
     destOffset += stride;
-    fast_read(is, (char*)dest, stride);
 
+    // Read into a temporary buffer sized for the largest valid list count type (4 bytes)
+    // This prevents stack buffer overflow if stride > sizeof(uint32_t)
+    uint8_t temp[4] = {0, 0, 0, 0};
+    if (stride > 4)
+        throw std::runtime_error("invalid list count type: stride exceeds 4 bytes (list counts must be integer types, not float64)");
+
+    fast_read(is, (char*)temp, stride);
+
+    // Convert to uint32_t based on source type
+    uint32_t value = 0;
     switch (t)
     {
-    case Type::INT16:  *(int16_t*)dest = endian_swap<int16_t, int16_t>(*(int16_t*)dest);     break;
-    case Type::UINT16: *(uint16_t*)dest = endian_swap<uint16_t, uint16_t>(*(uint16_t*)dest); break;
-    case Type::INT32:  *(int32_t*)dest = endian_swap<int32_t, int32_t>(*(int32_t*)dest);     break;
-    case Type::UINT32: *(uint32_t*)dest = endian_swap<uint32_t, uint32_t>(*(uint32_t*)dest); break;
-    default: break;
+    case Type::INT8:   value = static_cast<uint32_t>(*reinterpret_cast<int8_t*>(temp));   break;
+    case Type::UINT8:  value = static_cast<uint32_t>(*reinterpret_cast<uint8_t*>(temp));  break;
+    case Type::INT16:
+        if (isBigEndian) *reinterpret_cast<int16_t*>(temp) = endian_swap<int16_t, int16_t>(*reinterpret_cast<int16_t*>(temp));
+        value = static_cast<uint32_t>(*reinterpret_cast<int16_t*>(temp));
+        break;
+    case Type::UINT16:
+        if (isBigEndian) *reinterpret_cast<uint16_t*>(temp) = endian_swap<uint16_t, uint16_t>(*reinterpret_cast<uint16_t*>(temp));
+        value = static_cast<uint32_t>(*reinterpret_cast<uint16_t*>(temp));
+        break;
+    case Type::INT32:
+        if (isBigEndian) *reinterpret_cast<int32_t*>(temp) = endian_swap<int32_t, int32_t>(*reinterpret_cast<int32_t*>(temp));
+        value = static_cast<uint32_t>(*reinterpret_cast<int32_t*>(temp));
+        break;
+    case Type::UINT32:
+        if (isBigEndian) *reinterpret_cast<uint32_t*>(temp) = endian_swap<uint32_t, uint32_t>(*reinterpret_cast<uint32_t*>(temp));
+        value = *reinterpret_cast<uint32_t*>(temp);
+        break;
+    default:
+        throw std::runtime_error("invalid list count type: must be an integer type (int8, uint8, int16, uint16, int32, uint32)");
     }
+
+    *dest = value;
     return stride;
+}
+
+// Legacy function for backward compatibility - wraps read_list_count_binary for big-endian
+inline size_t read_list_binary_be(const Type & t, const size_t& stride, void * dest, size_t & destOffset,  std::istream & is)
+{
+    return read_list_count_binary(t, stride, static_cast<uint32_t*>(dest), destOffset, is, true);
 }
 
 inline size_t read_property_binary(const size_t & stride, void * dest, size_t & destOffset, std::istream & is)
@@ -340,9 +372,8 @@ struct PlyFile::PlyFileImpl
 
     struct ElementLayoutInfo
     {
-        bool is_fixed_layout{ false };
-        bool fast_path_eligible{ false };           // direct copy possible (all props to same buffer, no lists)
-        ParsingHelper* fast_path_helper{ nullptr }; // destination for fast path
+        bool is_fixed_layout{ false };              // row stride is known (no variable-length lists)
+        bool fast_path_eligible{ false };           // bulk read possible (all props requested AND is_fixed_layout)
         size_t row_stride{ 0 };
         std::vector<size_t> property_offsets;
         std::vector<size_t> property_sizes;
@@ -415,10 +446,8 @@ namespace io
         {
             if (p.isList)
             {
-                if constexpr (IsBigEndian)
-                    read_list_binary_be(p.listType, f.list_stride, &list_size, dummy_count, is);
-                else
-                    read_property_binary(f.list_stride, &list_size, dummy_count, is);
+                // Use safe list count reading that validates stride and handles endianness
+                read_list_count_binary(p.listType, f.list_stride, &list_size, dummy_count, is, IsBigEndian);
                 return read_property_binary(f.prop_stride * list_size, dest + dest_off, dest_off, is);
             }
             return read_property_binary(f.prop_stride * batch_read, dest + dest_off, dest_off, is);
@@ -428,10 +457,8 @@ namespace io
         {
             if (p.isList)
             {
-                if constexpr (IsBigEndian)
-                    read_list_binary_be(p.listType, f.list_stride, &list_size, dummy_count, is);
-                else
-                    read_property_binary(f.list_stride, &list_size, dummy_count, is);
+                // Use safe list count reading that validates stride and handles endianness
+                read_list_count_binary(p.listType, f.list_stride, &list_size, dummy_count, is, IsBigEndian);
                 const size_t bytes = f.prop_stride * list_size;
                 is.ignore(bytes);
                 if (is.fail()) throw std::runtime_error("failed to skip binary data (unexpected EOF or stream error)");
@@ -456,7 +483,10 @@ namespace io
                 for (size_t i = 0; i < list_size; ++i) read_property_ascii(p.propertyType, f.prop_stride, dest + dest_off, dest_off, is);
                 return f.prop_stride * list_size;
             }
-            return static_cast<size_t>(read_property_ascii(p.propertyType, f.prop_stride, dest + dest_off, dest_off, is));
+            // Read batch_read values for batched non-list properties (must match binary behavior)
+            for (size_t i = 0; i < batch_read; ++i)
+                read_property_ascii(p.propertyType, f.prop_stride, dest + dest_off, dest_off, is);
+            return f.prop_stride * batch_read;
         }
 
         static inline size_t skip(const PlyFile::PlyFileImpl::PropertyLookup & f, const PlyProperty & p, std::istream & is, uint32_t & list_size, size_t & dummy_count, size_t batch_read)
@@ -601,8 +631,6 @@ PlyFile::PlyFileImpl::ElementLayoutInfo PlyFile::PlyFileImpl::compute_element_la
     info.fast_path_eligible = true;  // assume eligible until proven otherwise
     info.row_stride = 0;
 
-    ParsingHelper * first_helper = nullptr;
-
     for (size_t i = 0; i < element.properties.size(); ++i)
     {
         const auto & prop = element.properties[i];
@@ -610,13 +638,10 @@ PlyFile::PlyFileImpl::ElementLayoutInfo PlyFile::PlyFileImpl::compute_element_la
 
         info.property_offsets.push_back(info.row_stride);
 
-        // Fast path eligibility: all properties requested, same helper, no lists
-        if (info.fast_path_eligible)
-        {
-            if      (lookup.skip || prop.isList) info.fast_path_eligible = false;
-            else if (!first_helper) first_helper = lookup.helper;
-            else if (lookup.helper != first_helper) info.fast_path_eligible = false;
-        }
+        // Fast path eligibility: all properties must be requested (no skips)
+        // Lists are allowed if they have a known size (list_size_hint or listCount)
+        if (lookup.skip)
+            info.fast_path_eligible = false;
 
         if (prop.isList)
         {
@@ -643,8 +668,8 @@ PlyFile::PlyFileImpl::ElementLayoutInfo PlyFile::PlyFileImpl::compute_element_la
         }
     }
 
-    if (info.fast_path_eligible && first_helper) info.fast_path_helper = first_helper;
-    else info.fast_path_eligible = false;
+    // fast_path_eligible requires: all properties requested AND is_fixed_layout
+    info.fast_path_eligible = info.fast_path_eligible && info.is_fixed_layout;
 
     return info;
 }
@@ -706,6 +731,13 @@ bool PlyFile::PlyFileImpl::parse_header(std::istream & is)
         {
             if (p.propertyType == Type::INVALID)  success = false;
             if (p.isList && p.listType == Type::INVALID) success = false;
+            // List count types must be integer types (not float32 or float64)
+            // Using float types for list counts would cause buffer overflows during parsing
+            if (p.isList && (p.listType == Type::FLOAT32 || p.listType == Type::FLOAT64))
+            {
+                throw std::runtime_error("invalid list count type in property '" + p.name +
+                    "': list counts must use integer types (int8, uint8, int16, uint16, int32, uint32), not float or double");
+            }
         }
     }
 
@@ -762,6 +794,18 @@ void PlyFile::PlyFileImpl::write_property_binary(std::ostream & os, const uint8_
 
 void PlyFile::PlyFileImpl::read(std::istream & is)
 {
+    // Reset cursor offsets and totalSizeBytes for potential re-read
+    // This is critical: if read() is called multiple times, byteOffset would
+    // otherwise accumulate, causing buffer overflows
+    for (auto & entry : userData)
+    {
+        entry.second.cursor->byteOffset = 0;
+        entry.second.cursor->totalSizeBytes = 0;
+    }
+
+    // Also invalidate cached parsing state in case the stream or requests changed
+    parsing_state_cached = false;
+
     std::vector<std::shared_ptr<PlyData>> buffers;
     for (auto & entry : userData) buffers.push_back(entry.second.data);
 
@@ -1127,29 +1171,20 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
         const auto & batches = element_batches[element_idx];
         const auto & layout = element_layouts[element_idx];
 
-        // Binary second pass optimization: bulk read with optional fast path
+        // Binary second pass optimization: bulk read + AoS->SoA scatter
+        // Enabled when all properties are requested AND layout is fixed (no variable-length lists)
         if constexpr (IsBinary && !FirstPass)
         {
-            if (layout.is_fixed_layout && element.size > 0)
+            if (layout.fast_path_eligible && element.size > 0)
             {
+                std::cout << "USING FAST PATH!!!!!!!!!!!!!!!!!" << std::endl;
                 const size_t total_bytes = element.size * layout.row_stride;
 
-                // Fast path: direct read when layout matches output buffer exactly (little-endian only)
-                if constexpr (!IsBigEndian)
-                {
-                    if (layout.fast_path_eligible)
-                    {
-                        fast_read(is, reinterpret_cast<char*>(layout.fast_path_helper->data->buffer.get() + layout.fast_path_helper->cursor->byteOffset), total_bytes);
-                        layout.fast_path_helper->cursor->byteOffset += total_bytes;
-                        ++element_idx;
-                        continue;
-                    }
-                }
-
-                // Bulk read: read entire element, then scatter to individual buffers
+                // Bulk read entire element into staging buffer
                 bulk_buffer.resize(total_bytes);
                 fast_read(is, reinterpret_cast<char*>(bulk_buffer.data()), total_bytes);
 
+                // AoS->SoA scatter: distribute properties to their respective cursor buffers
                 for (size_t row = 0; row < element.size; ++row)
                 {
                     const uint8_t* row_ptr = bulk_buffer.data() + (row * layout.row_stride);
@@ -1157,8 +1192,6 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
                     for (size_t pi = 0; pi < lookups.size(); ++pi)
                     {
                         const auto & lookup = lookups[pi];
-                        if (lookup.skip) continue;
-
                         auto * helper = lookup.helper;
                         const auto & prop = element.properties[pi];
                         const size_t prop_offset = layout.property_offsets[pi];
@@ -1200,8 +1233,7 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
                     if constexpr (FirstPass)
                     {
                         helper->cursor->totalSizeBytes += io::skip(lookup, prop, is, list_size, dummy_count, batch_size);
-                        if (prop.isList)
-                            helper->temp_list_sizes.push_back(list_size);
+                        if (prop.isList) helper->temp_list_sizes.push_back(list_size);
                     }
                     else
                     {
