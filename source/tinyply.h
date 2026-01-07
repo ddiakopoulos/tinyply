@@ -937,9 +937,22 @@ void PlyFile::PlyFileImpl::write_binary_internal(std::ostream & os) noexcept
 
                 if (p.isList)
                 {
-                    std::memcpy(listSize, &p.listCount, sizeof(uint32_t));
+                    // Determine actual list count for this row:
+                    // 1. If p.listCount is set (from add_properties_to_element), use it
+                    // 2. Else if list_sizes is populated (variable-length), use per-row count
+                    // 3. Else calculate from buffer size (fixed-length lists from parsing)
+                    size_t list_count = p.listCount;
+                    if (list_count == 0)
+                    {
+                        if (!helper->data->list_sizes.empty())
+                            list_count = helper->data->list_sizes[i];
+                        else if (helper->data->count > 0 && f.prop_stride > 0)
+                            list_count = helper->data->buffer.size_bytes() / (helper->data->count * f.prop_stride);
+                    }
+
+                    std::memcpy(listSize, &list_count, sizeof(uint32_t));
                     write_property_binary(os, listSize, dummyCount, f.list_stride);
-                    write_property_binary(os, (helper->data->buffer.get_const() + helper->cursor->byteOffset), helper->cursor->byteOffset, f.prop_stride * p.listCount);
+                    write_property_binary(os, (helper->data->buffer.get_const() + helper->cursor->byteOffset), helper->cursor->byteOffset, f.prop_stride * list_count);
                 }
                 else
                 {
@@ -972,8 +985,18 @@ void PlyFile::PlyFileImpl::write_ascii_internal(std::ostream & os) noexcept
 
                 if (p.isList)
                 {
-                    os << p.listCount << " ";
-                    for (size_t j = 0; j < p.listCount; ++j)
+                    // Determine actual list count for this row (same logic as binary write)
+                    size_t list_count = p.listCount;
+                    if (list_count == 0)
+                    {
+                        if (!helper->data->list_sizes.empty())
+                            list_count = helper->data->list_sizes[i];
+                        else if (helper->data->count > 0 && f.prop_stride > 0)
+                            list_count = helper->data->buffer.size_bytes() / (helper->data->count * f.prop_stride);
+                    }
+
+                    os << list_count << " ";
+                    for (size_t j = 0; j < list_count; ++j)
                     {
                         write_property_ascii(p.propertyType, os, (helper->data->buffer.get() + helper->cursor->byteOffset), helper->cursor->byteOffset);
                     }
@@ -1177,7 +1200,6 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
         {
             if (layout.fast_path_eligible && element.size > 0)
             {
-                std::cout << "USING FAST PATH!!!!!!!!!!!!!!!!!" << std::endl;
                 const size_t total_bytes = element.size * layout.row_stride;
 
                 // Bulk read entire element into staging buffer
