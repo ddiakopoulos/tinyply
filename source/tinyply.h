@@ -190,7 +190,6 @@ namespace tinyply
 #include <algorithm>
 #include <functional>
 #include <type_traits>
-#include <iostream>
 #include <cstring>
 
 namespace tinyply

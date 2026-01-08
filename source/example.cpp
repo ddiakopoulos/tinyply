@@ -2,7 +2,7 @@
 // recognized, you are granted a perpetual, irrevocable license to copy,
 // distribute, and modify this file as you see fit.
 // https://github.com/ddiakopoulos/tinyply
-// Version 2.3
+// Version 3.0
 
 // The purpose of this file is to demonstrate the tinyply API and provide several almost-complete
 // functions that can be copied and pasted into your own application or library. Because tinyply
@@ -267,9 +267,13 @@ void read_gaussian_splat_ply(const std::string & filepath)
 int main(int argc, char *argv[])
 {
     // Circular write-read
-    write_ply_example("example_cube");
-    read_ply_file("example_cube-ascii.ply");
-    read_ply_file("example_cube-binary.ply", true);
+    //write_ply_example("example_cube");
+    //read_ply_file("example_cube-ascii.ply");
+    //read_ply_file("example_cube-binary.ply", true);
+
+    //read_gaussian_splat_ply("../assets/splats/goldorak-ply.ply");
+    //read_ply_file("../assets/validate/valid/navvis.HQ3rdFloor.SLAM.5mm.ply", false);
+    read_ply_file("../assets/validate/valid/lucy_le.ply", false);
 
     return EXIT_SUCCESS;
 }
