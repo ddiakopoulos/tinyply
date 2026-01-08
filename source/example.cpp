@@ -103,7 +103,9 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
 
         // The header information can be used to programmatically extract properties on elements
         // known to exist in the header prior to reading the data. For brevity of this sample, properties 
-        // like vertex position are hard-coded: 
+        // like vertex position are hard-coded. Also check out the parser from tests.cpp, which shows
+        // how to programmatically extract all properties from all elements, which can be helpful 
+        // to ensure use of of tinyply's little-endian binary fast-path. 
         try { vertices = file.request_properties_from_element("vertex", { "x", "y", "z" }); }
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
@@ -171,6 +173,9 @@ void read_gaussian_splat_ply(const std::string & filepath)
 {
     std::ifstream file_stream(filepath, std::ios::binary);
     if (!file_stream) throw std::runtime_error("file_stream failed to open " + filepath);
+
+    file_stream.seekg(0, std::ios::end);
+    const float size_mb = file_stream.tellg() * float(1e-6);
     file_stream.seekg(0, std::ios::beg);
 
     tinyply::PlyFile splat_ply;
@@ -239,7 +244,11 @@ void read_gaussian_splat_ply(const std::string & filepath)
         f_rest.reset();
     }
 
+    manual_timer read_timer;
+
+    read_timer.start();
     splat_ply.read(file_stream);
+    read_timer.stop();
 
     if (xyz)      std::cout << "\tRead " << xyz->count << " total xyz " << std::endl;
     if (nrm)      std::cout << "\tRead " << nrm->count << " total normals " << std::endl;
@@ -248,6 +257,9 @@ void read_gaussian_splat_ply(const std::string & filepath)
     if (quat_rot) std::cout << "\tRead " << quat_rot->count << " total quaternion rotations" << std::endl;
     if (f_dc)     std::cout << "\tRead " << f_dc->count << " total sh f_dc " << std::endl;
     if (f_rest)   std::cout << "\tRead " << f_rest->count << " total sh f_rest " << std::endl;
+
+    const float parsing_time = static_cast<float>(read_timer.get()) / 1000.f;
+    std::cout << "\tparsing " << size_mb << "mb in " << parsing_time << " seconds [" << (size_mb / parsing_time) << " MBps]" << std::endl;
 
     // do something with your fancy gaussian splat
 }
@@ -258,9 +270,6 @@ int main(int argc, char *argv[])
     write_ply_example("example_cube");
     read_ply_file("example_cube-ascii.ply");
     read_ply_file("example_cube-binary.ply", true);
-
-    //read_gaussian_splat_ply("../assets/splats/Rose.ply");
-    //read_ply_file("../assets/validate/valid/lucy_le.ply", true);
 
     return EXIT_SUCCESS;
 }
