@@ -103,7 +103,7 @@ std::string parse_ply_file(const std::string & filepath, bool transcode = false)
             {
                 // Use list_size_hint=0 for list properties to handle variable-length lists
                 size_t list_hint = p.isList ? 0 : 0;
-                auto data = file.request_properties_from_element(e.name, { p.name }, list_hint);
+                auto data = file.request_properties_from_element(e.name, { p.name }, static_cast<uint32_t>(list_hint));
                 all_properties[e.name + "." + p.name] = data;
             }
             catch (const std::exception &) { /**/ }
@@ -383,6 +383,81 @@ TEST_CASE("requested property groups must all share the same type")
     CHECK_THROWS_AS(file.request_properties_from_element("vertex", { "x", "y", "z", "r", "g", "b", "a", "uv1", "uv2" }), std::invalid_argument);
 }
 
+TEST_CASE("properties must be requested in file order (swizzle detection)")
+{
+    // Create an in-memory PLY with properties in BGR order
+    const char* ply_data =
+        "ply\n"
+        "format ascii 1.0\n"
+        "element vertex 2\n"
+        "property uchar blue\n"
+        "property uchar green\n"
+        "property uchar red\n"
+        "end_header\n"
+        "10 20 30\n"
+        "40 50 60\n";
+
+    std::istringstream stream(ply_data);
+    PlyFile file;
+    REQUIRE(file.parse_header(stream));
+
+    // Requesting in file order (BGR) should succeed
+    SUBCASE("file order succeeds")
+    {
+        std::istringstream stream2(ply_data);
+        PlyFile file2;
+        REQUIRE(file2.parse_header(stream2));
+        CHECK_NOTHROW(file2.request_properties_from_element("vertex", { "blue", "green", "red" }));
+    }
+
+    // Requesting in reversed order (RGB) should throw with helpful message
+    SUBCASE("reversed order throws")
+    {
+        std::istringstream stream2(ply_data);
+        PlyFile file2;
+        REQUIRE(file2.parse_header(stream2));
+        CHECK_THROWS_AS(file2.request_properties_from_element("vertex", { "red", "green", "blue" }), std::invalid_argument);
+    }
+
+    // Requesting partial out-of-order should also throw
+    SUBCASE("partial out-of-order throws")
+    {
+        std::istringstream stream2(ply_data);
+        PlyFile file2;
+        REQUIRE(file2.parse_header(stream2));
+        CHECK_THROWS_AS(file2.request_properties_from_element("vertex", { "green", "blue" }), std::invalid_argument);
+    }
+
+    // Requesting partial in-order should succeed
+    SUBCASE("partial in-order succeeds")
+    {
+        std::istringstream stream2(ply_data);
+        PlyFile file2;
+        REQUIRE(file2.parse_header(stream2));
+        CHECK_NOTHROW(file2.request_properties_from_element("vertex", { "blue", "green" }));
+        CHECK_NOTHROW(file2.request_properties_from_element("vertex", { "red" }));
+    }
+
+    // Verify the exception message is helpful
+    SUBCASE("exception message is helpful")
+    {
+        std::istringstream stream2(ply_data);
+        PlyFile file2;
+        REQUIRE(file2.parse_header(stream2));
+        try
+        {
+            file2.request_properties_from_element("vertex", { "red", "green", "blue" });
+            FAIL("Expected exception was not thrown");
+        }
+        catch (const std::invalid_argument& e)
+        {
+            std::string msg = e.what();
+            CHECK(msg.find("file order") != std::string::npos);
+            CHECK(msg.find("swizzle") != std::string::npos);
+        }
+    }
+}
+
 // An earlier (but widespread) version of Assimp had a non-conformant PLY exporter and did not prepend comments with "comment" 
 TEST_CASE("check for invalid strings in the header")
 {
@@ -431,6 +506,22 @@ TEST_CASE("check that variable length lists are supported")
         // texcoords all have same length (6), so list_sizes should be empty
         REQUIRE(texcoords->list_sizes.empty());
     }
+}
+
+TEST_CASE("check that incorrect list_size_hint throws exception")
+{
+    // kcrane.city.ply has variable-length face indices (mix of triangles and quads)
+    // Providing an incorrect hint should throw an exception
+    std::ifstream filestream("../assets/validate/valid/kcrane.city.ply", std::ios::binary);
+    PlyFile file;
+    bool header_result = file.parse_header(filestream);
+    REQUIRE(header_result);
+
+    // Request with hint=3, but file contains faces with 4+ vertices
+    std::shared_ptr<PlyData> faces;
+    faces = file.request_properties_from_element("face", { "vertex_indices" }, 3);
+
+    CHECK_THROWS_AS(file.read(filestream), std::runtime_error);
 }
 
 TEST_CASE("check that int128 is an unrecognized, non-conformant datatype")
