@@ -61,8 +61,8 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
 
     try
     {
-        // For most files < 1gb, pre-loading the entire file upfront and wrapping it into a 
-        // stream is a net win for parsing speed, about 40% faster. 
+        // For most files < 1gb, preloading the entire file upfront into memory and wrapping it into a 
+        // stream is a net win for parsing speed (~30-40% faster)
         if (preload_into_memory)
         {
             byte_buffer = read_file_binary(filepath);
@@ -121,14 +121,13 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
         try { texcoords = file.request_properties_from_element("vertex", { "u", "v" }); }
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
-        // !!! Important Performance Optimization !!! 
+        // >>> Important Performance Optimization <<<
         // Providing a list size hint (the last argument) is a 2x performance improvement. If you have 
-        // arbitrary in-the-wild user-imported ply files, you should not provide this argument. 
+        // arbitrary in-the-wild user-imported ply files, set this argument to 0. 
         try { faces = file.request_properties_from_element("face", { "vertex_indices" }, 3); }
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
-        // Tristrips must always be read with a 0 list size hint (unless you know exactly how many elements
-        // are specifically in the file, which is unlikely); 
+        // Tristrips must always be read with a list size hint set to 0
         try { tristrip = file.request_properties_from_element("tristrips", { "vertex_indices" }, 0); }
         catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
@@ -147,15 +146,16 @@ void read_ply_file(const std::string & filepath, const bool preload_into_memory 
         if (texcoords)  std::cout << "\tRead " << texcoords->count << " total vertex texcoords " << std::endl;
         if (faces)      std::cout << "\tRead " << faces->count     << " total faces (triangles) " << std::endl;
         if (tristrip)   std::cout << "\tRead " << (tristrip->buffer.size_bytes() / tinyply::PropertyTable[tristrip->t].stride) << " total indices (tristrip) " << std::endl;
+        if (faces->list_sizes.size()) std::cout << "\tRead " << faces->list_sizes.size() << " varible-length indices " << std::endl;
 
-        // Example One: converting to your own application types
+        // Example one: converting to your own application types
         {
             const size_t numVerticesBytes = vertices->buffer.size_bytes();
             std::vector<float3> verts(vertices->count);
             std::memcpy(verts.data(), vertices->buffer.get(), numVerticesBytes);
         }
 
-        // Example Two: converting to your own application type
+        // Example two: converting to your own application type
         {
             std::vector<float3> verts_floats;
             std::vector<double3> verts_doubles;
@@ -230,7 +230,7 @@ void read_gaussian_splat_ply(const std::string & filepath)
         else if (prop.name.substr(0, 7) == "f_rest_") { sh_rest_names.push_back(prop.name); }
     }
 
-    // get spherical harmonic coefficients
+    // spherical harmonic coefficients
     try { f_dc = splat_ply.request_properties_from_element("vertex", sh_dc_names); }
     catch (const std::exception & e) { std::cerr << "tinyply exception: " << e.what() << std::endl; }
 
@@ -238,10 +238,9 @@ void read_gaussian_splat_ply(const std::string & filepath)
     {
         f_rest = splat_ply.request_properties_from_element("vertex", sh_rest_names);
     }
-    catch (const std::exception & e) 
+    catch (...) 
     {
-        // not an error if there are no f_rest components
-        f_rest.reset();
+        f_rest.reset(); // not an error if there are no f_rest components
     }
 
     manual_timer read_timer;
@@ -261,19 +260,15 @@ void read_gaussian_splat_ply(const std::string & filepath)
     const float parsing_time = static_cast<float>(read_timer.get()) / 1000.f;
     std::cout << "\tparsing " << size_mb << "mb in " << parsing_time << " seconds [" << (size_mb / parsing_time) << " MBps]" << std::endl;
 
-    // do something with your fancy gaussian splat
+    // do something with your fancy gaussian splat!
 }
 
 int main(int argc, char *argv[])
 {
     // Circular write-read
-    //write_ply_example("example_cube");
-    //read_ply_file("example_cube-ascii.ply");
-    //read_ply_file("example_cube-binary.ply", true);
-
-    //read_gaussian_splat_ply("../assets/splats/goldorak-ply.ply");
-    //read_ply_file("../assets/validate/valid/navvis.HQ3rdFloor.SLAM.5mm.ply", false);
-    read_ply_file("../assets/validate/valid/lucy_le.ply", false);
+    write_ply_example("example_cube");
+    read_ply_file("example_cube-ascii.ply");
+    read_ply_file("example_cube-binary.ply", true);
 
     return EXIT_SUCCESS;
 }
