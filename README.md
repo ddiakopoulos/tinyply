@@ -2,6 +2,7 @@
 
 [![Release is 3.0](http://img.shields.io/badge/release-3.0-blue.svg?style=flat)](https://raw.githubusercontent.com/ddiakopoulos/tinyply/master/source/tinyply.h)
 [![License is Unlicense](http://img.shields.io/badge/license-Unlicense-blue.svg?style=flat)](http://unlicense.org/)
+[![CMake on multiple platforms](https://github.com/ddiakopoulos/tinyply/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/ddiakopoulos/tinyply/actions/workflows/cmake-multi-platform.yml)
 
 A single-header, zero-dependency (except the C++ STL) __public domain__ implementation of the PLY mesh file format. An overview and definition of the file format is available [here](http://paulbourke.net/dataformats/ply/). This format is often used in the computer vision and graphics communities for its relative simplicity, ability to support arbitrary mesh attributes, and binary modes. Since ~2023 it has been used one of the primary interchange formats between applications & pipelines for gaussian splatting. Most famously, PLY is used to distribute models in the [Stanford 3D Scanning Repository](http://graphics.stanford.edu/data/3Dscanrep/), including the original bunny. 
 
