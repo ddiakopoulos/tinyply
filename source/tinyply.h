@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <functional>
 #include <type_traits>
+#include <cmath>
 
 namespace tinyply
 {
@@ -253,6 +254,8 @@ template<typename T> inline T ply_read_ascii(std::istream & is)
     is >> data;
     if (is.fail())
         throw std::runtime_error("failed to read ascii property value");
+    if (std::is_floating_point<T>::value && std::isnan(static_cast<double>(data)))
+        throw std::runtime_error("NaN values are not supported in ascii PLY files");
     return data;
 }
 
@@ -264,6 +267,13 @@ template<typename T> inline void ply_cast_ascii(void* dest, std::istream & is)
 inline void fast_read(std::istream & is, char * dest, std::streamsize count)
 {
     if (is.rdbuf()->sgetn(dest, count) != count) throw std::runtime_error("failed to read binary data (unexpected EOF or stream error)");
+}
+
+inline void validate_list_hint(uint32_t actual, uint32_t hint)
+{
+    if (hint > 0 && actual != hint)
+        throw std::runtime_error("list_size_hint mismatch: hint=" + std::to_string(hint) +
+            ", actual=" + std::to_string(actual) + ". Use list_size_hint=0 for variable-length lists.");
 }
 
 inline size_t read_list_count_binary(const Type & t, const size_t& stride, uint32_t * dest, size_t & destOffset, std::istream & is, bool be)
@@ -419,8 +429,8 @@ namespace io
         {
             if (p.isList)
             {
-                // Use safe list count reading that validates stride and handles endianness
                 read_list_count_binary(p.listType, f.list_stride, &list_size, dummy_count, is, big_endian);
+                if (f.helper) validate_list_hint(list_size, f.helper->list_size_hint);
                 return read_property_binary(f.prop_stride * list_size, dest + dest_off, dest_off, is);
             }
             return read_property_binary(f.prop_stride * batch_read, dest + dest_off, dest_off, is);
@@ -451,12 +461,11 @@ namespace io
         {
             if (p.isList)
             {
-                // list header (count)
                 read_property_ascii(p.listType, f.list_stride, &list_size, dummy_count, is);
+                if (f.helper) validate_list_hint(list_size, f.helper->list_size_hint);
                 for (size_t i = 0; i < list_size; ++i) read_property_ascii(p.propertyType, f.prop_stride, dest + dest_off, dest_off, is);
                 return f.prop_stride * list_size;
             }
-            // Read batch_read values for batched non-list properties (must match binary behavior)
             for (size_t i = 0; i < batch_read; ++i)
                 read_property_ascii(p.propertyType, f.prop_stride, dest + dest_off, dest_off, is);
             return f.prop_stride * batch_read;
@@ -1085,6 +1094,16 @@ std::shared_ptr<PlyData> PlyFile::PlyFileImpl::request_properties_from_element(c
             throw std::invalid_argument("the following property keys were not found in the header: " + ss.str());
         }
 
+        // Check if properties are requested in file order (swizzle detection)
+        int64_t lastIndex = -1;
+        for (const auto & key : propertyKeys)
+        {
+            const int64_t idx = find_property(key, element.properties);
+            if (idx <= lastIndex)
+                throw std::invalid_argument("properties must be requested in file order; swizzle after read()");
+            lastIndex = idx;
+        }
+
         for (const auto & key : propertyKeys)
         {
             const int64_t propertyIndex = find_property(key, element.properties);
@@ -1203,8 +1222,11 @@ void PlyFile::PlyFileImpl::parse_data_impl(std::istream & is)
 
                         if (prop.isList)
                         {
-                            uint32_t lc = prop.listCount ? static_cast<uint32_t>(prop.listCount) : helper->list_size_hint;
-                            size_t data_size = lookup.prop_stride * lc;
+                            uint32_t actual_count = 0;
+                            std::memcpy(&actual_count, row_ptr + prop_offset, lookup.list_stride); // LE only
+                            uint32_t expected = prop.listCount ? static_cast<uint32_t>(prop.listCount) : helper->list_size_hint;
+                            validate_list_hint(actual_count, expected);
+                            size_t data_size = lookup.prop_stride * actual_count;
                             std::memcpy(helper->data->buffer.get() + helper->cursor->byteOffset, row_ptr + prop_offset + lookup.list_stride, data_size);
                             helper->cursor->byteOffset += data_size;
                         }
